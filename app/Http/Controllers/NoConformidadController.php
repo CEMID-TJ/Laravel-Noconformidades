@@ -8,151 +8,793 @@ use Carbon\Carbon;
 
 class NoConformidadController extends Controller
 {
-    // 1. CARGA LA VISTA PRINCIPAL (Reemplaza la parte inferior de tu archivo original)
+    private $mTipoRegistro = [
+        'No Conformidad' => 'Incumplimiento de un requisito Legal o de procedimientos internos que no afecta la prestación del servicio educativo o la oferta de valor con los clientes (Estudiantes y padres de familia)',
+        'Servicio no Conforme' => 'Incumplimiento de requisito directamente relacionado con el servicio que se entrega al cliente, es decir, el servicio educativo, y que se presenta durante la prestación de este.',
+        'Corrección' => 'Acción para eliminar de manera inmediata un fallo o desviación detectada.',
+        'Acción Preventiva' => 'Acción desarrollada para evitar que un riesgo o desarrollo de una actividad se materialicé en No conformidad o servicio no conforme.',
+        'Acción Correctiva' => 'Acción para eliminar la causa de una no conformidad y evitar que vuelva a ocurrir',
+        'Acción de Mejora' => 'Ajuste propuesto con el fin de mejorar el desempeño, agilizar la acción o aumentar positivamente la percepción de las partes interesadas.'
+    ];
+
+    // Equivalente a las variables de sesión de tu sistema heredado
+    private function getSessionData()
+    {
+        $usuario = session('Usuario', '1054540722'); // Johan Rodriguez por defecto en pruebas
+        $nomUsuario = session('NomUsuario', 'Johan Rodriguez');
+        $perfil = session('Perfil', 'ADMIN'); // ADMIN, DIREC, DUEPR
+
+        $esAdminPerfil = $this->inList($perfil, 'ADMIN');
+
+        $adminList = [
+            $esAdminPerfil ? $usuario : '98381246',
+            '79558178',   // CAMILO VELANDIA
+            '1054540722', // Johan Rodriguez
+            '1014305622', // Laura Valentina
+            '1073696610', // Jenniffer Bello
+            '52841712',   // Diana Álvarez
+            '1233909122', // Eduardo León
+            '1022928448'  // JABIER BARRERA
+        ];
+
+        $reversarList = [
+            $esAdminPerfil ? $usuario : '98381246',
+            '1014305622', // Laura Valentina
+            '1073696610', // Jenniffer Bello
+            '1233909122', // Eduardo León
+            '1022928448'  // JABIER BARRERA
+        ];
+
+        $generalList = [
+            $esAdminPerfil ? $usuario : '98381246',
+            '39665007', '79404413', '8730314', '37829191', '40025213', '41405252',
+            '79879905', '39668167', '1072665948', '52903643', '1032380671', '52378375',
+            '52226604', '80241390', '52849113', '1024471606', '53048628', '52382262',
+            '52159469', '53067789', '1024509359', '32764527', '63347978', '63489430',
+            '1098682989', '37556707', '1010171514', '1023861416', '79844012', '52190948',
+            '1024539393', '1073152711', '1023013296', '1014220582', '1015428198', '1030610691',
+            '1022340598', '1022415485', '52803785', '37547875', '37752414', '52233576',
+            '1019050390', '1073696610', '1014305622', '3276248'
+        ];
+
+        return [
+            'Usuario' => $usuario,
+            'NomUsuario' => $nomUsuario,
+            'Perfil' => $perfil,
+            'PuedeAdministrar' => in_array($usuario, $adminList),
+            'PuedeReversar' => in_array($usuario, $reversarList),
+            'PuedeGeneral' => in_array($usuario, $generalList),
+            'PuedeCerrar' => $this->inList($perfil, 'DIREC', 'ADMIN', 'DUEPR') || in_array($usuario, $adminList)
+        ];
+    }
+
+    private function inList($valor, ...$lista)
+    {
+        foreach ($lista as $item) {
+            if (stripos($valor, $item) !== false) return true;
+        }
+        return false;
+    }
+
+    // Funciones equivalentes a funciones.php (DarFecha, DarFechaSQL, DarFechaHora)
+    public static function darFecha($fecha)
+    {
+        if (empty($fecha) || $fecha === '0000-00-00' || substr($fecha, 0, 10) === '0000-00-00') return '';
+        try {
+            return Carbon::parse($fecha)->format('d/m/Y');
+        } catch (\Exception $e) {
+            return '';
+        }
+    }
+
+    public static function darFechaHora($fecha, $tipo = 1)
+    {
+        if (empty($fecha) || $fecha === '0000-00-00' || substr($fecha, 0, 10) === '0000-00-00') return '';
+        try {
+            $dt = Carbon::parse($fecha);
+            if ($tipo == 1) return $dt->format('d/m/Y');
+            return $dt->format('d/m/Y H:i');
+        } catch (\Exception $e) {
+            return '';
+        }
+    }
+
+    public static function darFechaSQL($fecha)
+    {
+        if (empty($fecha)) return null;
+        $fechaLimpia = str_replace('-', '/', trim($fecha));
+        try {
+            if (preg_match('/^\d{1,2}\/\d{1,2}\/\d{4}$/', $fechaLimpia)) {
+                return Carbon::createFromFormat('d/m/Y', $fechaLimpia)->format('Y-m-d');
+            }
+            return Carbon::parse($fecha)->format('Y-m-d');
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    // =========================================================================
+    // 1. PANTALLA PRINCIPAL Y FILTRADO DE NO CONFORMIDADES
+    // =========================================================================
     public function index(Request $request)
     {
-        // Consultas básicas para los selects de filtros
+        $sesion = $this->getSessionData();
+        $PuedeAdministrar = $sesion['PuedeAdministrar'];
+        $PuedeReversar = $sesion['PuedeReversar'];
+        $PuedeGeneral = $sesion['PuedeGeneral'];
+        $PuedeCerrar = $sesion['PuedeCerrar'];
+        $Usuario = $sesion['Usuario'];
+        $NomUsuario = $sesion['NomUsuario'];
+        $mTipoRegistro = $this->mTipoRegistro;
+
+        // Listado de Gestiones
         $gestiones = DB::table('calidad.gestiones')->orderBy('NomGestion')->get();
-        
-        // Simulación de sesión (Ajustar cuando migres tu login a Laravel)
-        $usuarioActual = "1054540722"; // Johan Rodriguez
-        $puedeAdministrar = true; 
 
-        $queryProcesos = DB::table('calidad.procesos');
-        if (!$puedeAdministrar) {
-            $queryProcesos->whereRaw("FIND_IN_SET(?, DueProceso)", [$usuarioActual]);
+        // Listado de Procesos para el filtro superior y modal de reportes
+        if ($PuedeAdministrar || $PuedeGeneral) {
+            $procesos = DB::select("SELECT CodGestion, Colegio, CodProceso, NomProceso FROM calidad.procesos ORDER BY CodGestion, NomProceso");
+        } else {
+            $procesos = DB::select("SELECT DISTINCT CodGestion, Colegio, CodProceso, NomProceso FROM calidad.procesos WHERE FIND_IN_SET(?, DueProceso) ORDER BY CodGestion, NomProceso", [$Usuario]);
         }
-        $procesos = $queryProcesos->orderBy('CodGestion')->orderBy('NomProceso')->get();
 
-        // Consulta principal de No Conformidades
-        $query = DB::table('calidad.noconformidades as NC')
-            ->join('calidad.procesos as P', function($join) {
-                $join->on('P.CodGestion', '=', 'NC.CodGestion')
-                     ->on(DB::raw('CONCAT(P.Colegio, P.CodProceso)'), '=', 'NC.Proceso');
-            })
-            ->leftJoin('recursos.emplea as E', 'NC.Responsable', '=', 'E.Nit_CCE')
-            ->select('NC.*', DB::raw("CONCAT(E.Nom,' ',E.Apellido1) AS NomResponsable"));
-
-        // Lógica de Filtros
-        if ($request->filled('Filtrar')) {
-            if ($request->filled('FiltroNumeroNC')) {
-                $query->whereIn('NC.NumeroNC', explode(',', $request->FiltroNumeroNC));
+        $noConformidades = [];
+        if ($request->input('Filtrar') == 1) {
+            if ($PuedeAdministrar) {
+                $Filtrico = "WHERE NC.NumeroNC";
+            } elseif ($PuedeGeneral) {
+                $Filtrico = "WHERE NC.Borrada=0";
             } else {
-                if ($request->filled('FiltroCodGestion')) $query->where('NC.CodGestion', $request->FiltroCodGestion);
-                if ($request->filled('FiltroProceso')) $query->where('NC.Proceso', $request->FiltroProceso);
-                if ($request->filled('FiltroTipo')) $query->where('NC.Tipo', $request->FiltroTipo);
-                
-                switch ($request->FiltroTipoAcciones) {
-                    case 1: $query->where(fn($q) => $q->whereNull('NC.Accion')->orWhere('NC.Accion', '')); break;
-                    case 2: $query->whereNotNull('NC.Accion')->where('NC.Accion', '!=', ''); break;
-                    case 3: $query->where(fn($q) => $q->whereNull('NC.FCierre')->orWhere('NC.FCierre', '')); break;
-                    case 4: $query->whereNotNull('NC.FCierre')->where('NC.FCierre', '!=', ''); break;
+                $Filtrico = "WHERE NC.Borrada=0 AND P.DueProceso LIKE '%" . addslashes($Usuario) . "%'";
+            }
+
+            if ($request->filled('FiltroNumeroNC')) {
+                $numNC = addslashes($request->input('FiltroNumeroNC'));
+                $Filtrico .= " AND FIND_IN_SET(NC.NumeroNC, '{$numNC}')";
+            } else {
+                if ($request->filled('FiltroCodGestion')) {
+                    $Filtrico .= " AND NC.CodGestion = '" . addslashes($request->input('FiltroCodGestion')) . "'";
+                }
+                if ($request->filled('FiltroTipo')) {
+                    $Filtrico .= " AND NC.Tipo = '" . addslashes($request->input('FiltroTipo')) . "'";
+                }
+                $acc = $request->input('FiltroTipoAcciones');
+                if ($acc == 1) {
+                    $Filtrico .= " AND (NC.Accion = '' OR ISNULL(NC.Accion))";
+                } elseif ($acc == 2) {
+                    $Filtrico .= " AND (NC.Accion <> '' AND !(ISNULL(NC.Accion)))";
+                } elseif ($acc == 3) {
+                    $Filtrico .= " AND (NC.FCierre = '' OR ISNULL(NC.FCierre) OR NC.FCierre = '0000-00-00')";
+                } elseif ($acc == 4) {
+                    $Filtrico .= " AND (NC.FCierre <> '' AND !(ISNULL(NC.FCierre)) AND NC.FCierre <> '0000-00-00')";
+                }
+                if ($request->filled('FiltroProceso')) {
+                    $Filtrico .= " AND NC.Proceso = '" . addslashes($request->input('FiltroProceso')) . "'";
                 }
             }
+
+            if ($request->input('Ordencito') == 1) {
+                $Ordenacioncita = " ORDER BY NC.NumeroNC DESC";
+            } else {
+                $Ordenacioncita = " ORDER BY NC.FApertura DESC";
+            }
+
+            $Queri = "SELECT NC.*, CONCAT(E.Nom,' ',E.Apellido1) AS NomResponsable
+                      FROM calidad.procesos P
+                      JOIN calidad.noconformidades NC ON P.CodGestion=NC.CodGestion AND CONCAT(P.Colegio,P.CodProceso)=NC.Proceso
+                      LEFT JOIN recursos.emplea E ON NC.Responsable=E.Nit_CCE " . $Filtrico . $Ordenacioncita;
+
+            $noConformidades = DB::select($Queri);
         }
 
-        // Ordenamiento
-        $orden = $request->Ordencito == 1 ? 'NC.NumeroNC' : 'NC.FApertura';
-        $noConformidades = $query->orderByDesc($orden)->get();
-
-        return view('noconformidades.index', compact('gestiones', 'procesos', 'noConformidades'));
+        return view('noconformidades.index', compact(
+            'gestiones', 'procesos', 'mTipoRegistro', 'noConformidades',
+            'PuedeAdministrar', 'PuedeReversar', 'PuedeGeneral', 'PuedeCerrar', 'NomUsuario'
+        ));
     }
 
-    // 2. ENDPOINT PARA EL SELECT2 DINÁMICO (Reemplaza a JorCambioGestionProceso)
-    public function getProcesos($codGestion)
+    // =========================================================================
+    // 2. RETORNAR LOS DATOS DE UNA NO CONFORMIDAD PARA CONSULTA (MODAL)
+    // =========================================================================
+    public function mostrar(Request $request)
     {
-        $procesos = DB::table('calidad.procesos')
-            ->where('CodGestion', $codGestion)
-            ->orderBy('NomProceso')
-            ->get()
-            ->map(function($proc) {
-                return [
-                    'codigo' => $proc->Colegio . $proc->CodProceso,
-                    'nombre' => $proc->NomProceso
-                ];
-            });
+        $sesion = $this->getSessionData();
+        $PuedeAdministrar = $sesion['PuedeAdministrar'];
+        $mTipoRegistro = $this->mTipoRegistro;
+        $numNC = $request->input('NumeroNC');
 
-        return response()->json(['status' => 'success', 'procesos' => $procesos], 200, [], JSON_UNESCAPED_UNICODE);
+        $Queri = "SELECT NC.NumeroNC, NC.Tipo, NC.CodGestion, Ges.NomGestion, NC.Proceso, NC.FApertura, NC.DetectadaEn, NC.Descripcion, NC.Correccion,
+                         CONCAT(E.Nom,' ',E.Apellido1) AS NomResponsable, NC.Causas, NC.RequiereAC, NC.NumeroNCAccionCorrectiva,
+                         NC.Accion, NC.ResultadoRevision, NC.FRevision, NC.MotivoCierre, NC.NuevaAccion, NC.FCierre, NC.RCierre
+                  FROM calidad.noconformidades NC
+                  LEFT JOIN recursos.emplea E ON NC.Responsable=E.Nit_CCE
+                  JOIN calidad.gestiones Ges ON NC.CodGestion=Ges.CodGestion
+                  WHERE NC.NumeroNC = ?
+                  LIMIT 1";
+
+        $results = DB::select($Queri, [$numNC]);
+        if (empty($results)) {
+            return response("<b>No existe</b>");
+        }
+        $Row = (array) $results[0];
+
+        ob_start();
+        ?>
+        <div class="col-sm-2 panel panel-default">
+            <label class="label-xsmall fw-bold">Consecutivo:</label> <?php echo $Row['NumeroNC']; ?>
+        </div>
+        <div class="col-sm-4 panel panel-default">
+            <label class="label-xsmall fw-bold">Responsable de la apertura:</label> <?php echo $Row['NomResponsable']; ?>
+        </div>
+        <div class="col-sm-6 panel panel-default">
+            <label class="label-xsmall fw-bold">Tipo:</label> <?php echo $Row['Tipo'] . ' - ' . ($mTipoRegistro[$Row['Tipo']] ?? ''); ?>
+        </div>
+        <div class="clearfix"></div>
+        <div class="col-sm-3 panel panel-default">
+            <label class="label-xsmall fw-bold">Gestión:</label> <?php echo $Row['NomGestion']; ?>
+        </div>
+        <div class="col-sm-3 panel panel-default">
+            <label class="label-xsmall fw-bold">Proceso:</label> <?php echo $Row['Proceso']; ?>
+        </div>
+        <div class="col-sm-3 panel panel-default">
+            <label class="label-xsmall fw-bold">Fecha de apertura:</label> <?php echo self::darFecha($Row['FApertura']); ?>
+        </div>
+        <div class="col-sm-3 panel panel-default">
+            <label class="label-xsmall fw-bold">Detectada en:</label> <?php echo $Row['DetectadaEn']; ?>
+        </div>
+        <div class="clearfix"></div>
+        <div class="col-sm-12 panel panel-default">
+            <label class="label-xsmall fw-bold">Descripción:</label> <?php echo $Row['Descripcion']; ?>
+        </div>
+        <div class="clearfix"></div>
+        <div class="col-sm-12 panel panel-default">
+            <label class="label-xsmall fw-bold">Relación de actividades:</label> <?php echo $Row['Correccion']; ?>
+        </div>
+        <?php if ($Row['Tipo'] == 'Corrección'): ?>
+            <div class="clearfix"></div>
+            <div class="col-sm-8 panel panel-default">
+                <label class="label-xsmall fw-bold">Con la acción determinada se garantiza que la falla o posible materialización del riesgo no se presente de nuevo?:</label>
+                <?php echo ($Row['RequiereAC'] == 1 ? 'Si' : ($Row['RequiereAC'] == -1 ? 'No' : '')); ?>
+            </div>
+            <?php if ($Row['RequiereAC'] == -1): ?>
+                <div class="col-sm-4 panel panel-default">
+                    <label class="label-xsmall fw-bold">ID de la acción correctiva vinculada a esta corrección:</label>
+                    <a style="cursor:pointer" onClick="MostrarDivConsultaNoConformidad(<?php echo $Row['NumeroNCAccionCorrectiva']; ?>);" title="Ver <?php echo $Row['NumeroNCAccionCorrectiva']; ?> acción correctiva vinculada a esta corrección"><?php echo $Row['NumeroNC']; ?></a>
+                </div>
+            <?php endif; ?>
+        <?php endif; ?>
+        <div class="clearfix"></div>
+        <div class="col-sm-9 panel panel-default">
+            <label class="label-xsmall fw-bold">Causas o Ventajas:</label> <?php echo $Row['Causas']; ?>
+        </div>
+        <div class="col-sm-3 panel panel-default">
+            <label class="label-xsmall fw-bold">Fecha acordada para la revisión:</label> <?php echo self::darFecha($Row['FRevision']); ?>
+        </div>
+        <div class="clearfix"></div>
+        <?php
+        $pdfPath = public_path("Archivos/NoConformidades/" . trim($numNC) . ".pdf");
+        if (file_exists($pdfPath)) {
+            $pdfUrl = asset("Archivos/NoConformidades/" . trim($numNC) . ".pdf");
+            $imgPdf = asset("imagenes/pdf.png");
+            echo "<a href='{$pdfUrl}' class='col-sm-12 btn btn-default btn-file' title='Ver Archivo Adjunto' target='_blank'><img src='{$imgPdf}' border='0'>Ver Archivo Adjunto</a>";
+        }
+        ?>
+        <div class="clearfix"></div>
+        <?php
+        $condBorrada = $PuedeAdministrar ? "" : "AND Borrada=0";
+        $QueriNCS = "SELECT NCS.* FROM calidad.ncseguimiento NCS WHERE NumeroNC = ? {$condBorrada} ORDER BY ConsecutivoS";
+        $ResultNCS = DB::select($QueriNCS, [$numNC]);
+
+        if (count($ResultNCS) > 0): ?>
+            <div class="col-sm-12 panel panel-primary mt-3">
+                <h5><b>SEGUIMIENTOS</b></h5>
+                <div class="row">
+                <?php foreach ($ResultNCS as $rNCS): $RowNCS = (array) $rNCS; ?>
+                    <div class="col-sm-6 panel panel-default">
+                        <label class="label-xsmall fw-bold">(<?php echo $RowNCS["ConsecutivoS"]; ?>)Acción (Correctiva o Preventiva)</label>
+                        <?php echo ($RowNCS['Borrada'] ? ('<b style="background:red">BORRADA ' . $RowNCS['Accion'] . '</b>') : $RowNCS['Accion']); ?>
+                    </div>
+                    <div class="col-sm-6 panel panel-default">
+                        <label class="label-xsmall fw-bold">Resultado Esperado</label> <?php echo $RowNCS['Resultado']; ?>
+                    </div>
+                    <div class="clearfix"></div>
+                    <div class="col-sm-3 panel panel-default">
+                        <label class="label-xsmall fw-bold">Fecha Apertura:</label> <?php echo self::darFechaHora($RowNCS["FHSeguimiento"], 3); ?>
+                    </div>
+                    <div class="col-sm-3 panel panel-default">
+                        <label class="label-xsmall fw-bold">Fecha Seguimiento:</label> <?php echo self::darFecha($RowNCS["Fecha"]); ?>
+                    </div>
+                    <div class="col-sm-4 panel panel-default">
+                        <label class="label-xsmall fw-bold">Realizado Por:</label> <?php echo $RowNCS["RealizadoPor"]; ?>
+                    </div>
+                    <div class="col-sm-2 panel panel-default">
+                        <label class="label-xsmall fw-bold">Alcanzado:</label> <?php echo ($RowNCS["Alcanzado"] == 1 ? "Si" : ($RowNCS["Alcanzado"] == -1 ? "No" : "")); ?>
+                    </div>
+                    <div class="clearfix mb-2 border-bottom"></div>
+                <?php endforeach; ?>
+                </div>
+            </div>
+        <?php endif; ?>
+
+        <?php if (!empty($Row['FCierre']) && $Row['FCierre'] > '0000-00-00'): ?>
+            <div class="col-sm-12 panel panel-primary mt-3">
+                <h5><b>DATOS DEL CIERRE</b></h5>
+                <div class="row">
+                    <div class="col-sm-6 panel panel-default">
+                        <label class="label-xsmall fw-bold">Resultados de la revisión de la <i title="Entiéndase la eficacia como el grado en que se realizan las actividades planificadas y se logran los resultados planificados"><u>eficacia</u></i> de las acciones tomadas:</label> <?php echo $Row['ResultadoRevision']; ?>
+                    </div>
+                    <div class="col-sm-6 panel panel-default">
+                        <label class="label-xsmall fw-bold">Motivos del Cierre:</label> <?php echo $Row['MotivoCierre']; ?>
+                    </div>
+                    <div class="clearfix"></div>
+                    <div class="col-sm-6 panel panel-default">
+                        <label class="label-xsmall fw-bold">Nueva Acción?:</label> <?php echo $Row['NuevaAccion']; ?>
+                    </div>
+                    <div class="col-sm-2 panel panel-default">
+                        <label class="label-xsmall fw-bold">Fecha del Cierre:</label> <?php echo self::darFecha($Row['FCierre']); ?>
+                    </div>
+                    <div class="col-sm-4 panel panel-default">
+                        <label class="label-xsmall fw-bold">Responsable del Cierre:</label> <?php echo $Row['RCierre']; ?>
+                    </div>
+                </div>
+            </div>
+        <?php endif;
+
+        return response(ob_get_clean());
     }
 
-    // 3. ENDPOINT PARA CARGAR DATOS AL EDITAR (Reemplaza a Ajax1JorA1NoConformidad)
-    public function edit($id)
+    // =========================================================================
+    // 3. RETORNAR LOS DATOS DE UNA NO CONFORMIDAD PARA EDICIÓN (JSON)
+    // =========================================================================
+    public function editar(Request $request)
     {
-        $nc = DB::table('calidad.noconformidades as NC')
-            ->leftJoin(DB::raw("(SELECT NumeroNC, MAX(IDQueja) AS IDQueja FROM calidad.quejas GROUP BY NumeroNC) as QQueja"), 'NC.NumeroNC', '=', 'QQueja.NumeroNC')
-            ->leftJoin('recursos.emplea as E', 'NC.Responsable', '=', 'E.Nit_CCE')
-            ->select('NC.*', DB::raw("CONCAT(E.Nom,' ',E.Apellido1) AS NomResponsable"), 'QQueja.IDQueja')
-            ->where('NC.NumeroNC', $id)
+        $numNC = $request->input('NumeroNC');
+        $Queri = "SELECT NC.*, CONCAT(E.Nom,' ',E.Apellido1) AS NomResponsable, QQueja.IDQueja
+                  FROM calidad.noconformidades NC
+                  LEFT JOIN (SELECT NumeroNC, MAX(IDQueja) AS IDQueja FROM calidad.quejas WHERE NumeroNC = ?) AS QQueja ON NC.NumeroNC=QQueja.NumeroNC
+                  LEFT JOIN recursos.emplea E ON NC.Responsable=E.Nit_CCE
+                  WHERE NC.NumeroNC = ?
+                  LIMIT 1";
+
+        $results = DB::select($Queri, [$numNC, $numNC]);
+        if (!empty($results)) {
+            $Row = (array) $results[0];
+            $respuesta = [
+                'status' => 'OK',
+                'CodGestion' => $Row['CodGestion'],
+                'Proceso' => $Row['Proceso'],
+                'NomResponsable' => $Row['NomResponsable'],
+                'Tipo' => $Row['Tipo'],
+                'FApertura' => self::darFecha($Row['FApertura']),
+                'DetectadaEn' => $Row['DetectadaEn'],
+                'DetectadaEnOtra' => ($Row['DetectadaEn'] != 'Quejas' ? $Row['DetectadaEn'] : $Row['IDQueja']),
+                'Descripcion' => $Row['Descripcion'],
+                'Correccion' => $Row['Correccion'],
+                'RequiereAC' => $Row['RequiereAC'],
+                'NumeroNCAccionCorrectiva' => $Row['NumeroNCAccionCorrectiva'],
+                'Causas' => $Row['Causas'],
+                'Accion' => $Row['Accion'],
+                'FRevision' => self::darFecha($Row['FRevision']),
+                'YaCargado' => (file_exists(public_path("Archivos/NoConformidades/" . trim($numNC) . ".pdf")) ? 1 : 0)
+            ];
+        } else {
+            $respuesta = ['status' => 'Error'];
+        }
+
+        return response()->json($respuesta);
+    }
+
+    // =========================================================================
+    // 4. GRABAR LOS DATOS DE UNA NO CONFORMIDAD (CREAR / ACTUALIZAR)
+    // =========================================================================
+    public function grabar(Request $request)
+    {
+        try {
+            $sesion = $this->getSessionData();
+            $Usuario = $sesion['Usuario'];
+            $ipAcceso = $request->ip();
+
+            $detectadaEn = $request->input('DetectadaEn');
+            if ($detectadaEn == 'Otra') {
+                $detectadaEn = $request->input('DetectadaEnOtra');
+            }
+
+            $fAperturaSQL = self::darFechaSQL($request->input('FApertura'));
+            $fRevisionSQL = self::darFechaSQL($request->input('FRevision'));
+            $numeroNC = $request->input('NumeroNC');
+
+            if ($numeroNC == 'Nuevo') {
+                $numeroNC = DB::table('calidad.noconformidades')->insertGetId([
+                    'Responsable' => $Usuario,
+                    'Tipo' => $request->input('Tipo'),
+                    'CodGestion' => $request->input('CodGestion'),
+                    'Proceso' => $request->input('Proceso'),
+                    'FApertura' => $fAperturaSQL,
+                    'DetectadaEn' => $detectadaEn,
+                    'Descripcion' => $request->input('Descripcion') ?? '',
+                    'Correccion' => $request->input('Correccion') ?? '',
+                    'RequiereAC' => $request->input('RequiereAC') ?: 0,
+                    'NumeroNCAccionCorrectiva' => $request->input('NumeroNCAccionCorrectiva') ?: 0,
+                    'Causas' => $request->input('Causas') ?? '',
+                    'Accion' => $request->input('Accion') ?? '',
+                    'FRevision' => $fRevisionSQL,
+                    'IPApertura' => $ipAcceso,
+                    'FHApertura' => now()
+                ]);
+            } else {
+                DB::table('calidad.noconformidades')
+                    ->where('NumeroNC', $numeroNC)
+                    ->limit(1)
+                    ->update([
+                        'CodGestion' => $request->input('CodGestion'),
+                        'Tipo' => $request->input('Tipo'),
+                        'Proceso' => $request->input('Proceso'),
+                        'FApertura' => $fAperturaSQL,
+                        'DetectadaEn' => $detectadaEn,
+                        'Descripcion' => $request->input('Descripcion') ?? '',
+                        'Correccion' => $request->input('Correccion') ?? '',
+                        'RequiereAC' => $request->input('RequiereAC') ?: 0,
+                        'NumeroNCAccionCorrectiva' => $request->input('NumeroNCAccionCorrectiva') ?: 0,
+                        'Causas' => $request->input('Causas') ?? '',
+                        'Accion' => $request->input('Accion') ?? '',
+                        'FRevision' => $fRevisionSQL,
+                        'IPApertura' => DB::raw("IF(IPApertura<>'', IPApertura, '{$ipAcceso}')"),
+                        'FHApertura' => DB::raw("IF(FHApertura>0, FHApertura, SYSDATE())")
+                    ]);
+            }
+
+            if ($request->hasFile('FileNoConformidad')) {
+                $uploadFolder = public_path('Archivos/NoConformidades');
+                if (!file_exists($uploadFolder)) {
+                    mkdir($uploadFolder, 0775, true);
+                }
+                $request->file('FileNoConformidad')->move($uploadFolder, $numeroNC . ".pdf");
+            }
+
+            if ($request->input('DetectadaEn') == 'Quejas' && intval($request->input('DetectadaEnOtra'))) {
+                DB::table('calidad.quejas')
+                    ->where('IDQueja', intval($request->input('DetectadaEnOtra')))
+                    ->limit(1)
+                    ->update(['NumeroNC' => $numeroNC]);
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'id' => $numeroNC
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ]);
+        }
+    }
+
+    // =========================================================================
+    // 5. RETORNAR LOS SEGUIMIENTOS DE UNA NO CONFORMIDAD PARA EDICIÓN
+    // =========================================================================
+    public function obtenerSeguimientos(Request $request)
+    {
+        $numNC = $request->input('NumeroNC');
+        $ResultNCS = DB::select("SELECT NCS.* FROM calidad.ncseguimiento NCS WHERE Borrada=0 AND NumeroNC = ? ORDER BY ConsecutivoS", [$numNC]);
+
+        $mRegistro = 0;
+        $imgInvalid = asset('imagenes/invalid.png');
+
+        ob_start();
+        if (count($ResultNCS) > 0) {
+            foreach ($ResultNCS as $rNCS) {
+                $RowNCS = (array) $rNCS;
+                $mRegistro++;
+                $this->renderBloqueSeguimiento($mRegistro, $RowNCS, $imgInvalid);
+            }
+        } else {
+            $mRegistro = 1;
+            $RowNCS = ['Accion' => '', 'Resultado' => '', 'Fecha' => '', 'RealizadoPor' => '', 'Alcanzado' => 0];
+            $this->renderBloqueSeguimiento($mRegistro, $RowNCS, $imgInvalid);
+        }
+        ?>
+        <input name="CantSeguimientos" type="hidden" id="CantSeguimientos" value="<?php echo $mRegistro; ?>">
+        <?php
+        return response(ob_get_clean());
+    }
+
+    private function renderBloqueSeguimiento($mRegistro, $RowNCS, $imgInvalid)
+    {
+        ?>
+        <div class="col-sm-12 panel panel-primary border rounded p-3 mb-3 bg-light row g-2" id="DivSeguimiento<?php echo $mRegistro; ?>">
+            <input name="Borrada<?php echo $mRegistro; ?>" type="hidden" id="Borrada<?php echo $mRegistro; ?>">
+            <div class="col-sm-6 panel form-group">
+                <label class="label-xsmall fw-bold">Objetivo principal del plan de Acción</label>
+                <span class="badge bg-secondary float-end" id="SpanSeguimiento<?php echo $mRegistro; ?>"><?php echo $mRegistro; ?></span>
+                <textarea name="Accion<?php echo $mRegistro; ?>" id="Accion<?php echo $mRegistro; ?>" class="form-control label-xsmall" placeholder="Objetivo principal del plan de Acción" rows="2"><?php echo $RowNCS['Accion']; ?></textarea>
+            </div>
+            <div class="col-sm-6 panel form-group">
+                <label class="label-xsmall fw-bold">Resultado Esperado</label>
+                <textarea name="Resultado<?php echo $mRegistro; ?>" id="Resultado<?php echo $mRegistro; ?>" class="form-control label-xsmall" placeholder="Resultado Esperado" rows="2"><?php echo $RowNCS['Resultado']; ?></textarea>
+            </div>
+            <div class="clearfix"></div>
+            <div class="col-sm-3 panel form-group">
+                <label class="label-xsmall fw-bold">Fecha Seguimiento:</label>
+                <input type="text" name="Fecha<?php echo $mRegistro; ?>" id="Fecha<?php echo $mRegistro; ?>" class="form-control" onChange="ValidarFecha(this)" onBlur="ValidarFecha(this)" value="<?php echo self::darFecha($RowNCS['Fecha']); ?>">
+            </div>
+            <div class="col-sm-6 panel form-group">
+                <label class="label-xsmall fw-bold">Realizado Por:</label>
+                <input type="text" name="RealizadoPor<?php echo $mRegistro; ?>" id="RealizadoPor<?php echo $mRegistro; ?>" class="form-control" value="<?php echo $RowNCS['RealizadoPor']; ?>">
+            </div>
+            <div class="col-sm-2 panel form-group">
+                <label class="label-xsmall fw-bold">Alcanzado:</label>
+                <select name="Alcanzado<?php echo $mRegistro; ?>" class="form-select" id="Alcanzado<?php echo $mRegistro; ?>">
+                    <option value="0" selected></option>
+                    <option value="1" <?php if ($RowNCS["Alcanzado"] == 1) echo "selected"; ?>>SI</option>
+                    <option value="-1" <?php if ($RowNCS["Alcanzado"] == -1) echo "selected"; ?>>NO</option>
+                </select>
+            </div>
+            <div class="col-sm-1 panel form-group d-flex align-items-end justify-content-center">
+                <button type="button" class="btn btn-sm btn-outline-danger" id="BotBorrarSeguimiento<?php echo $mRegistro; ?>">
+                    <a style="cursor:pointer" onClick="BorrarSeguimiento(this);" title="Borrar este seguimiento">
+                        <img hspace="2" width="16" height="16" src="<?php echo $imgInvalid; ?>" border="0" alt="X"/>
+                    </a>
+                </button>
+            </div>
+        </div>
+        <?php
+    }
+
+    // =========================================================================
+    // 6. GRABAR LOS SEGUIMIENTOS DE UNA NO CONFORMIDAD
+    // =========================================================================
+    public function grabarSeguimientos(Request $request)
+    {
+        try {
+            $numNC = intval($request->input('NumeroNCSeguimientos'));
+            $cant = intval($request->input('CantSeguimientos'));
+            $ipAcceso = $request->ip();
+
+            DB::table('calidad.ncseguimiento')
+                ->where('NumeroNC', $numNC)
+                ->update(['Borrada' => 1]);
+
+            $mFila = 0;
+            for ($i = 1; $i <= $cant; $i++) {
+                if ($request->input('Borrada' . $i) != 1) {
+                    $mFila++;
+                    $fechaSQL = self::darFechaSQL($request->input('Fecha' . $i));
+                    $accion = $request->input('Accion' . $i) ?? '';
+                    $resultado = $request->input('Resultado' . $i) ?? '';
+                    $realizadoPor = $request->input('RealizadoPor' . $i) ?? '';
+                    $alcanzado = $request->input('Alcanzado' . $i) ?: 0;
+
+                    $Queri = "INSERT INTO calidad.ncseguimiento (NumeroNC, ConsecutivoS, Fecha, Accion, Resultado, RealizadoPor, Alcanzado, IPSeguimiento, FHSeguimiento, Borrada)
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, SYSDATE(), 0)
+                              ON DUPLICATE KEY UPDATE
+                                Fecha = VALUES(Fecha),
+                                Accion = VALUES(Accion),
+                                Resultado = VALUES(Resultado),
+                                RealizadoPor = VALUES(RealizadoPor),
+                                Alcanzado = VALUES(Alcanzado),
+                                Borrada = 0";
+
+                    DB::statement($Queri, [$numNC, $mFila, $fechaSQL, $accion, $resultado, $realizadoPor, $alcanzado, $ipAcceso]);
+                }
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'id' => $numNC
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ]);
+        }
+    }
+
+    // =========================================================================
+    // 7. RETORNAR LOS DATOS DE UNA NO CONFORMIDAD PARA CIERRE
+    // =========================================================================
+    public function obtenerCierre(Request $request)
+    {
+        $sesion = $this->getSessionData();
+        $numNC = $request->input('NumeroNC');
+
+        $Row = DB::table('calidad.noconformidades')
+            ->select('NumeroNC', 'ResultadoRevision', 'MotivoCierre', 'NuevaAccion', 'FCierre', 'RCierre')
+            ->where('NumeroNC', $numNC)
             ->first();
 
-        if (!$nc) return response()->json(['status' => 'Error']);
+        if (!$Row) return response("Error");
 
-        return response()->json([
-            'status' => 'OK',
-            'CodGestion' => $nc->CodGestion,
-            'Proceso' => $nc->Proceso,
-            'NomResponsable' => $nc->NomResponsable,
-            'Tipo' => $nc->Tipo,
-            'FApertura' => $nc->FApertura ? Carbon::parse($nc->FApertura)->format('d/m/Y') : '',
-            'DetectadaEn' => $nc->DetectadaEn,
-            'DetectadaEnOtra' => ($nc->DetectadaEn !== 'Quejas') ? $nc->DetectadaEn : $nc->IDQueja,
-            'Descripcion' => $nc->Descripcion,
-            'Correccion' => $nc->Correccion,
-            'RequiereAC' => $nc->RequiereAC,
-            'NumeroNCAccionCorrectiva' => $nc->NumeroNCAccionCorrectiva,
-            'Causas' => $nc->Causas,
-            'Accion' => $nc->Accion,
-            'FRevision' => $nc->FRevision ? Carbon::parse($nc->FRevision)->format('d/m/Y') : '',
-            'YaCargado' => 0 // Ajustar con Storage::exists() cuando migres los archivos
-        ]);
+        $resRev = addslashes((string) $Row->ResultadoRevision);
+        $motCie = addslashes((string) $Row->MotivoCierre);
+        $nueAcc = addslashes((string) $Row->NuevaAccion);
+        $fCierre = self::darFecha($Row->FCierre);
+        $rCierre = addslashes($Row->RCierre ? $Row->RCierre : $sesion['NomUsuario']);
+
+        $js = "document.getElementById('ResultadoRevision').value = '{$resRev}';\n";
+        $js .= "document.getElementById('MotivoCierre').value = '{$motCie}';\n";
+        $js .= "document.getElementById('NuevaAccion').value = '{$nueAcc}';\n";
+        $js .= "document.getElementById('FCierre').value = '{$fCierre}';\n";
+        $js .= "document.getElementById('RCierre').value = '{$rCierre}';\n";
+
+        return response($js);
     }
 
-    // 4. ENDPOINT PARA GUARDAR O ACTUALIZAR (Reemplaza a JorGrabarNoConformidad)
-    public function store(Request $request)
+    // =========================================================================
+    // 8. GRABAR LOS DATOS DE CIERRE DE UNA NO CONFORMIDAD
+    // =========================================================================
+    public function grabarCierre(Request $request)
     {
         try {
-            $datos = $request->only([
-                'CodGestion', 'Proceso', 'Tipo', 'DetectadaEn', 'Descripcion', 
-                'Correccion', 'RequiereAC', 'NumeroNCAccionCorrectiva', 'Causas', 'Accion'
-            ]);
+            $sesion = $this->getSessionData();
+            $numNC = intval($request->input('NumeroNCCerrar'));
 
-            // Fechas a formato MySQL
-            $datos['FApertura'] = $request->filled('FApertura') ? Carbon::createFromFormat('d/m/Y', $request->FApertura)->format('Y-m-d') : null;
-            $datos['FRevision'] = $request->filled('FRevision') ? Carbon::createFromFormat('d/m/Y', $request->FRevision)->format('Y-m-d') : null;
+            DB::table('calidad.noconformidades')
+                ->where('NumeroNC', $numNC)
+                ->limit(1)
+                ->update([
+                    'ResultadoRevision' => $request->input('ResultadoRevision') ?? '',
+                    'MotivoCierre' => $request->input('MotivoCierre') ?? '',
+                    'NuevaAccion' => $request->input('NuevaAccion') ?? '',
+                    'FCierre' => self::darFechaSQL($request->input('FCierre')),
+                    'RCierre' => $sesion['Usuario'],
+                    'IPCierre' => $request->ip(),
+                    'FHCierre' => now()
+                ]);
 
-            if ($request->DetectadaEn == 'Otra') {
-                $datos['DetectadaEn'] = $request->DetectadaEnOtra;
-            }
-
-            if ($request->NumeroNC == 'Nuevo') {
-                $datos['Responsable'] = "1054540722"; // Usuario quemado temporalmente
-                $datos['IPApertura'] = $request->ip();
-                $datos['FHApertura'] = now();
-                
-                $id = DB::table('calidad.noconformidades')->insertGetId($datos);
-            } else {
-                $id = $request->NumeroNC;
-                $datos['IPApertura'] = DB::raw("IF(IPApertura<>'',IPApertura,'".$request->ip()."')");
-                $datos['FHApertura'] = DB::raw("IF(FHApertura>0,FHApertura,SYSDATE())");
-                
-                DB::table('calidad.noconformidades')->where('NumeroNC', $id)->update($datos);
-            }
-
-            // Aquí iría el bloque de subida de archivos y envío de correos (Lo podemos pulir después)
-
-            return response()->json(['status' => 'success', 'id' => $id]);
+            return response()->json(['status' => 'success']);
         } catch (\Exception $e) {
-            return response()->json(['status' => 'error', 'message' => $e->getMessage()]);
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ]);
         }
     }
 
-    // 5. ENDPOINT PARA REVERSAR (Reemplaza a JorReversarNoConformidad)
-    public function reversar(Request $request)
+    // =========================================================================
+    // 9. CAMBIO GESTIÓN PROCESO (SELECT DEPENDIENTE)
+    // =========================================================================
+    public function cambioGestionProceso(Request $request)
     {
         try {
+            $sesion = $this->getSessionData();
+            $codGestion = $request->input('CodGestion');
+            $Usuario = $sesion['Usuario'];
+
+            if ($sesion['PuedeAdministrar'] || $sesion['PuedeGeneral']) {
+                $ResultProc = DB::select("SELECT Colegio, CodProceso, NomProceso FROM calidad.procesos WHERE CodGestion = ? ORDER BY NomProceso", [$codGestion]);
+            } else {
+                $ResultProc = DB::select("SELECT Colegio, CodProceso, NomProceso FROM calidad.procesos WHERE CodGestion = ? AND FIND_IN_SET(?, DueProceso) ORDER BY NomProceso", [$codGestion, $Usuario]);
+            }
+
+            $procesos = [];
+            foreach ($ResultProc as $rProc) {
+                $procesos[] = [
+                    'codigo' => $rProc->Colegio . $rProc->CodProceso,
+                    'nombre' => $rProc->NomProceso
+                ];
+            }
+
+            return response()->json([
+                'status' => 'success',
+                'procesos' => $procesos
+            ], 200, [], JSON_UNESCAPED_UNICODE);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => 'error',
+                'message' => $e->getMessage()
+            ]);
+        }
+    }
+
+    // =========================================================================
+    // 10. REPORTES EXCEL (SHEETJS)
+    // =========================================================================
+    public function enviarReportes(Request $request)
+    {
+        set_time_limit(0);
+        ini_set('memory_limit', '-1');
+
+        $sesion = $this->getSessionData();
+        $Usuario = $sesion['Usuario'];
+
+        if ($request->input('TipoReporte') == 'ReporteNoConformidades') {
+            try {
+                if ($sesion['PuedeAdministrar']) {
+                    $Filtrico = "WHERE NC.NumeroNC";
+                } elseif ($sesion['PuedeGeneral']) {
+                    $Filtrico = "WHERE NC.Borrada=0";
+                } else {
+                    $uEsc = addslashes($Usuario);
+                    $Filtrico = "WHERE NC.Borrada=0 AND (Pr.DueProceso LIKE '%{$uEsc}%' OR NC.Responsable='{$uEsc}')";
+                }
+
+                if ($request->filled('ReportProceso')) {
+                    $Filtrico .= " AND NC.Proceso = '" . addslashes($request->input('ReportProceso')) . "'";
+                }
+
+                $Queri = "SELECT NC.NumeroNC, NC.CodGestion, Pr.NomProceso, NC.Tipo, CONCAT(E.Nom,' ',E.Apellido1) AS NomResponsable,
+                                (TIMESTAMPDIFF(DAY, '1900-01-01', NC.FApertura)+2) AS FApertura, NC.DetectadaEn, NC.Descripcion, NC.Correccion,
+                                IF(NC.Tipo='Corrección' AND NC.RequiereAC=1,'Si',IF(NC.Tipo='Corrección' AND NC.RequiereAC=-1,'No','')) AS GarantiaNoReinsidencia,
+                                NC.NumeroNCAccionCorrectiva, NC.Causas, NC.Accion, NC.ResultadoRevision,
+                                (TIMESTAMPDIFF(DAY, '1900-01-01', NC.FRevision)+2) AS FRevision,
+                                NC.MotivoCierre, NC.NuevaAccion, (TIMESTAMPDIFF(DAY, '1900-01-01', NC.FCierre)+2) AS FCierre,
+                                NC.RCierre, IF(NC.Borrada,'Si','No') AS Borrada
+                          FROM calidad.procesos Pr
+                          JOIN calidad.noconformidades NC ON Pr.CodGestion=NC.CodGestion AND CONCAT(Pr.Colegio,Pr.CodProceso)=NC.Proceso
+                          LEFT JOIN recursos.emplea E ON NC.Responsable=E.Nit_CCE " . $Filtrico;
+
+                $Result = DB::select($Queri);
+
+                $Campos = "rows = prez.map(row => ({NumeroNC:row.NumeroNC," .
+                          "CodGestion:row.CodGestion," .
+                          "NomProceso:row.NomProceso," .
+                          "Tipo:row.Tipo," .
+                          "NomResponsable:row.NomResponsable," .
+                          "FApertura:(isNaN(parseInt(row.FApertura,10)) ? '' :parseInt(row.FApertura,10))," .
+                          "DetectadaEn:row.DetectadaEn," .
+                          "Descripcion:row.Descripcion," .
+                          "'Actividades (Correccion)':row.Correccion," .
+                          "'Acción Garantiza No Reinsidencia':row.GarantiaNoReinsidencia," .
+                          "'ID Acción Correctiva':row.NumeroNCAccionCorrectiva," .
+                          "'Causas o Ventajas':row.Causas," .
+                          "'Objetivo plan Acción':row.Accion," .
+                          "ResultadoRevision:row.ResultadoRevision," .
+                          "FRevision:(isNaN(parseInt(row.FRevision,10)) ? '' :parseInt(row.FRevision,10))," .
+                          "MotivoCierre:row.MotivoCierre," .
+                          "NuevaAccion:row.NuevaAccion," .
+                          "'Responsable Cierre':row.RCierre," .
+                          "FCierre:(isNaN(parseInt(row.FCierre,10)) ? '' :parseInt(row.FCierre,10))," .
+                          "Borrada:row.Borrada" .
+                          "}));";
+
+                $Formato = "formatColumn(worksheet, 5, 'dd/mm/yyyy');";
+                $Formato .= "formatColumn(worksheet, 14, 'dd/mm/yyyy');";
+                $Formato .= "formatColumn(worksheet, 18, 'dd/mm/yyyy');";
+
+                $respuestaFinal = [];
+                $respuestaFinal[] = [
+                    'Codigo' => 'Campos',
+                    'Campos' => $Campos,
+                    'Formato' => $Formato
+                ];
+
+                foreach ($Result as $r) {
+                    $Row = (array) $r;
+                    $Array = [];
+                    foreach ($Row as $Clave => $Valor) {
+                        if ($Valor !== null && strlen((string)$Valor) == 10 && strpos((string)$Valor, '-') !== false && self::darFecha($Valor) > '0-0-0') {
+                            $Array[$Clave] = str_replace('/', '-', self::darFecha($Valor));
+                        } else {
+                            $Array[$Clave] = trim((string)$Valor);
+                        }
+                    }
+                    $respuestaFinal[] = $Array;
+                }
+
+                return response()->json($respuestaFinal, 200, [], JSON_UNESCAPED_UNICODE);
+            } catch (\Exception $e) {
+                return response()->json([['Codigo' => 'Error', 'Mensaje' => $e->getMessage()]]);
+            }
+        }
+        return response()->json([]);
+    }
+
+    // =========================================================================
+    // 11. REVERSAR NO CONFORMIDAD
+    // =========================================================================
+    public function reversar(Request $request)
+    {
+        $sesion = $this->getSessionData();
+        if (!$sesion['PuedeReversar']) {
+            return response()->json(['status' => 'error', 'message' => 'No tiene permisos para reversar no conformidades']);
+        }
+
+        try {
             $afectados = DB::table('calidad.noconformidades')
-                ->where('NumeroNC', $request->NumeroNC)
+                ->where('NumeroNC', intval($request->input('NumeroNC')))
                 ->whereNotNull('FCierre')
+                ->limit(1)
                 ->update([
                     'FCierre' => null,
                     'RCierre' => null,
@@ -164,7 +806,7 @@ class NoConformidadController extends Controller
                 ]);
 
             if ($afectados == 0) {
-                return response()->json(['status' => 'error', 'message' => 'No se pudo reversar. Verifique que esté cerrada.']);
+                return response()->json(['status' => 'error', 'message' => 'No se pudo reversar la no conformidad. Verifique que esté cerrada.']);
             }
             return response()->json(['status' => 'success']);
         } catch (\Exception $e) {
