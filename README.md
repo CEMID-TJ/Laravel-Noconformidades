@@ -62,3 +62,7 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 ## License
 
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+
+# Laravel-Noconformidades
+Modulo de no conformidades desarrollado en laravel
+>>>>>>> fda6050047d3207f99c6fda9f8eb6bd1cb0136d4
