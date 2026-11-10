@@ -114,7 +114,7 @@ class NoConformidadController extends Controller
     }
 
     // =========================================================================
-    // 1. PANTALLA PRINCIPAL Y FILTRADO DE NO CONFORMIDADES
+    // 1. PANTALLA PRINCIPAL, FILTRADO Y PAGINACIÓN (20 POR PÁGINA)
     // =========================================================================
     public function index(Request $request)
     {
@@ -130,15 +130,24 @@ class NoConformidadController extends Controller
         // Listado de Gestiones
         $gestiones = DB::table('calidad.gestiones')->orderBy('NomGestion')->get();
 
-        // Listado de Procesos para el filtro superior y modal de reportes
+        // Listado de Procesos
         if ($PuedeAdministrar || $PuedeGeneral) {
             $procesos = DB::select("SELECT CodGestion, Colegio, CodProceso, NomProceso FROM calidad.procesos ORDER BY CodGestion, NomProceso");
         } else {
             $procesos = DB::select("SELECT DISTINCT CodGestion, Colegio, CodProceso, NomProceso FROM calidad.procesos WHERE FIND_IN_SET(?, DueProceso) ORDER BY CodGestion, NomProceso", [$Usuario]);
         }
 
+        // Forzar Filtrar = 1 por defecto al entrar (igual que en el script nuevo)
+        $filtrar = $request->input('Filtrar', 1);
+
         $noConformidades = [];
-        if ($request->input('Filtrar') == 1) {
+        $totalRegistros = 0;
+        $regPorPagina = 20;
+        $paginaActual = max(1, (int) $request->input('pagina', 1));
+        $totalPaginas = 1;
+        $offset = 0;
+
+        if ($filtrar == 1) {
             if ($PuedeAdministrar) {
                 $Filtrico = "WHERE NC.NumeroNC";
             } elseif ($PuedeGeneral) {
@@ -159,36 +168,48 @@ class NoConformidadController extends Controller
                 }
                 $acc = $request->input('FiltroTipoAcciones');
                 if ($acc == 1) {
-                    $Filtrico .= " AND (NC.Accion = '' OR ISNULL(NC.Accion))";
+                    $Filtrico .= " AND (NC.Accion = '' OR NC.Accion IS NULL)";
                 } elseif ($acc == 2) {
-                    $Filtrico .= " AND (NC.Accion <> '' AND !(ISNULL(NC.Accion)))";
+                    $Filtrico .= " AND (NC.Accion <> '' AND NC.Accion IS NOT NULL)";
                 } elseif ($acc == 3) {
-                    $Filtrico .= " AND (NC.FCierre = '' OR ISNULL(NC.FCierre) OR NC.FCierre = '0000-00-00')";
+                    $Filtrico .= " AND (NC.FCierre = '' OR NC.FCierre IS NULL OR NC.FCierre = '0000-00-00')";
                 } elseif ($acc == 4) {
-                    $Filtrico .= " AND (NC.FCierre <> '' AND !(ISNULL(NC.FCierre)) AND NC.FCierre <> '0000-00-00')";
+                    $Filtrico .= " AND (NC.FCierre <> '' AND NC.FCierre IS NOT NULL AND NC.FCierre <> '0000-00-00')";
                 }
                 if ($request->filled('FiltroProceso')) {
                     $Filtrico .= " AND NC.Proceso = '" . addslashes($request->input('FiltroProceso')) . "'";
                 }
             }
 
-            if ($request->input('Ordencito') == 1) {
-                $Ordenacioncita = " ORDER BY NC.NumeroNC DESC";
-            } else {
-                $Ordenacioncita = " ORDER BY NC.FApertura DESC";
-            }
+            $Ordenacioncita = ($request->input('Ordencito') == 1)
+                ? " ORDER BY NC.NumeroNC DESC"
+                : " ORDER BY NC.FApertura DESC";
 
-            $Queri = "SELECT NC.*, CONCAT(E.Nom,' ',E.Apellido1) AS NomResponsable
-                      FROM calidad.procesos P
-                      JOIN calidad.noconformidades NC ON P.CodGestion=NC.CodGestion AND CONCAT(P.Colegio,P.CodProceso)=NC.Proceso
-                      LEFT JOIN recursos.emplea E ON NC.Responsable=E.Nit_CCE " . $Filtrico . $Ordenacioncita;
+            $QueriBase = " FROM calidad.procesos P
+                          JOIN calidad.noconformidades NC ON P.CodGestion = NC.CodGestion AND CONCAT(P.Colegio, P.CodProceso) = NC.Proceso
+                          LEFT JOIN recursos.emplea E ON NC.Responsable = E.Nit_CCE " . $Filtrico;
+
+            // Conteo total para paginación
+            $countRes = DB::select("SELECT COUNT(*) AS total " . $QueriBase);
+            $totalRegistros = !empty($countRes) ? (int) $countRes[0]->total : 0;
+            $totalPaginas = max(1, (int) ceil($totalRegistros / $regPorPagina));
+
+            if ($paginaActual > $totalPaginas) {
+                $paginaActual = $totalPaginas;
+            }
+            $offset = ($paginaActual - 1) * $regPorPagina;
+
+            $Queri = "SELECT NC.*, CONCAT(E.Nom, ' ', E.Apellido1) AS NomResponsable "
+                   . $QueriBase . $Ordenacioncita
+                   . " LIMIT " . (int) $offset . ", " . (int) $regPorPagina;
 
             $noConformidades = DB::select($Queri);
         }
 
         return view('noconformidades.index', compact(
             'gestiones', 'procesos', 'mTipoRegistro', 'noConformidades',
-            'PuedeAdministrar', 'PuedeReversar', 'PuedeGeneral', 'PuedeCerrar', 'NomUsuario'
+            'PuedeAdministrar', 'PuedeReversar', 'PuedeGeneral', 'PuedeCerrar', 'NomUsuario',
+            'totalRegistros', 'regPorPagina', 'paginaActual', 'totalPaginas', 'offset', 'filtrar'
         ));
     }
 
@@ -478,19 +499,18 @@ class NoConformidadController extends Controller
         $ResultNCS = DB::select("SELECT NCS.* FROM calidad.ncseguimiento NCS WHERE Borrada=0 AND NumeroNC = ? ORDER BY ConsecutivoS", [$numNC]);
 
         $mRegistro = 0;
-        $imgInvalid = asset('imagenes/invalid.png');
 
         ob_start();
         if (count($ResultNCS) > 0) {
             foreach ($ResultNCS as $rNCS) {
                 $RowNCS = (array) $rNCS;
                 $mRegistro++;
-                $this->renderBloqueSeguimiento($mRegistro, $RowNCS, $imgInvalid);
+                $this->renderBloqueSeguimiento($mRegistro, $RowNCS);
             }
         } else {
             $mRegistro = 1;
             $RowNCS = ['Accion' => '', 'Resultado' => '', 'Fecha' => '', 'RealizadoPor' => '', 'Alcanzado' => 0];
-            $this->renderBloqueSeguimiento($mRegistro, $RowNCS, $imgInvalid);
+            $this->renderBloqueSeguimiento($mRegistro, $RowNCS);
         }
         ?>
         <input name="CantSeguimientos" type="hidden" id="CantSeguimientos" value="<?php echo $mRegistro; ?>">
@@ -498,43 +518,46 @@ class NoConformidadController extends Controller
         return response(ob_get_clean());
     }
 
-    private function renderBloqueSeguimiento($mRegistro, $RowNCS, $imgInvalid)
+    private function renderBloqueSeguimiento($mRegistro, $RowNCS)
     {
         ?>
-        <div class="col-sm-12 panel panel-primary border rounded p-3 mb-3 bg-light row g-2" id="DivSeguimiento<?php echo $mRegistro; ?>">
+        <div class="col-12 panel panel-primary nc-section mb-3" id="DivSeguimiento<?php echo $mRegistro; ?>">
             <input name="Borrada<?php echo $mRegistro; ?>" type="hidden" id="Borrada<?php echo $mRegistro; ?>">
-            <div class="col-sm-6 panel form-group">
-                <label class="label-xsmall fw-bold">Objetivo principal del plan de Acción</label>
-                <span class="badge bg-secondary float-end" id="SpanSeguimiento<?php echo $mRegistro; ?>"><?php echo $mRegistro; ?></span>
-                <textarea name="Accion<?php echo $mRegistro; ?>" id="Accion<?php echo $mRegistro; ?>" class="form-control label-xsmall" placeholder="Objetivo principal del plan de Acción" rows="2"><?php echo $RowNCS['Accion']; ?></textarea>
-            </div>
-            <div class="col-sm-6 panel form-group">
-                <label class="label-xsmall fw-bold">Resultado Esperado</label>
-                <textarea name="Resultado<?php echo $mRegistro; ?>" id="Resultado<?php echo $mRegistro; ?>" class="form-control label-xsmall" placeholder="Resultado Esperado" rows="2"><?php echo $RowNCS['Resultado']; ?></textarea>
-            </div>
-            <div class="clearfix"></div>
-            <div class="col-sm-3 panel form-group">
-                <label class="label-xsmall fw-bold">Fecha Seguimiento:</label>
-                <input type="text" name="Fecha<?php echo $mRegistro; ?>" id="Fecha<?php echo $mRegistro; ?>" class="form-control" onChange="ValidarFecha(this)" onBlur="ValidarFecha(this)" value="<?php echo self::darFecha($RowNCS['Fecha']); ?>">
-            </div>
-            <div class="col-sm-6 panel form-group">
-                <label class="label-xsmall fw-bold">Realizado Por:</label>
-                <input type="text" name="RealizadoPor<?php echo $mRegistro; ?>" id="RealizadoPor<?php echo $mRegistro; ?>" class="form-control" value="<?php echo $RowNCS['RealizadoPor']; ?>">
-            </div>
-            <div class="col-sm-2 panel form-group">
-                <label class="label-xsmall fw-bold">Alcanzado:</label>
-                <select name="Alcanzado<?php echo $mRegistro; ?>" class="form-select" id="Alcanzado<?php echo $mRegistro; ?>">
-                    <option value="0" selected></option>
-                    <option value="1" <?php if ($RowNCS["Alcanzado"] == 1) echo "selected"; ?>>SI</option>
-                    <option value="-1" <?php if ($RowNCS["Alcanzado"] == -1) echo "selected"; ?>>NO</option>
-                </select>
-            </div>
-            <div class="col-sm-1 panel form-group d-flex align-items-end justify-content-center">
-                <button type="button" class="btn btn-sm btn-outline-danger" id="BotBorrarSeguimiento<?php echo $mRegistro; ?>">
-                    <a style="cursor:pointer" onClick="BorrarSeguimiento(this);" title="Borrar este seguimiento">
-                        <img hspace="2" width="16" height="16" src="<?php echo $imgInvalid; ?>" border="0" alt="X"/>
-                    </a>
+            
+            <div class="seguimiento-header d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
+                <span class="badge bg-primary rounded-pill px-3 py-1" id="SpanSeguimiento<?php echo $mRegistro; ?>">
+                    Seguimiento <?php echo $mRegistro; ?>
+                </span>
+                <button type="button" class="action-btn action-danger" id="BotBorrarSeguimiento<?php echo $mRegistro; ?>" onClick="BorrarSeguimiento(this);" title="Borrar este seguimiento">
+                    <i class="bi bi-trash3"></i>
                 </button>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-6 form-group">
+                    <label class="label-xsmall">Objetivo principal del plan de Acción</label>
+                    <textarea name="Accion<?php echo $mRegistro; ?>" id="Accion<?php echo $mRegistro; ?>" class="form-control" placeholder="Objetivo principal del plan de Acción" rows="2"><?php echo $RowNCS['Accion']; ?></textarea>
+                </div>
+                <div class="col-md-6 form-group">
+                    <label class="label-xsmall">Resultado Esperado</label>
+                    <textarea name="Resultado<?php echo $mRegistro; ?>" id="Resultado<?php echo $mRegistro; ?>" class="form-control" placeholder="Resultado Esperado" rows="2"><?php echo $RowNCS['Resultado']; ?></textarea>
+                </div>
+                <div class="col-md-3 form-group">
+                    <label class="label-xsmall">Fecha Seguimiento:</label>
+                    <input type="text" name="Fecha<?php echo $mRegistro; ?>" id="Fecha<?php echo $mRegistro; ?>" class="form-control" placeholder="dd/mm/aaaa" onChange="ValidarFecha(this)" onBlur="ValidarFecha(this)" value="<?php echo self::darFecha($RowNCS['Fecha']); ?>">
+                </div>
+                <div class="col-md-6 form-group">
+                    <label class="label-xsmall">Realizado Por:</label>
+                    <input type="text" name="RealizadoPor<?php echo $mRegistro; ?>" id="RealizadoPor<?php echo $mRegistro; ?>" class="form-control" value="<?php echo $RowNCS['RealizadoPor']; ?>">
+                </div>
+                <div class="col-md-3 form-group">
+                    <label class="label-xsmall">Alcanzado:</label>
+                    <select name="Alcanzado<?php echo $mRegistro; ?>" class="form-select" id="Alcanzado<?php echo $mRegistro; ?>">
+                        <option value="0" selected>...</option>
+                        <option value="1" <?php if ($RowNCS["Alcanzado"] == 1) echo "selected"; ?>>SI</option>
+                        <option value="-1" <?php if ($RowNCS["Alcanzado"] == -1) echo "selected"; ?>>NO</option>
+                    </select>
+                </div>
             </div>
         </div>
         <?php
