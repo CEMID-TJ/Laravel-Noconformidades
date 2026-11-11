@@ -596,3 +596,27 @@ label {
     background-color: var(--success-hover) !important;
     border-color: #ffffff !important;
 }
+
+/* =======================================================
+   EFECTOS HOVER PARA LOS SEGUIMIENTOS
+   ======================================================= */
+.seguimiento-card {
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+    border: 1.5px solid var(--border-soft) !important;
+    /* AGREGA ESTA LÍNEA PARA AMPLIAR EL ESPACIO INTERNO */
+    padding: 24px 28px !important; 
+    border-radius: 12px;
+    background-color: #ffffff;
+}
+
+/* Efecto cuando pasas el mouse sobre la tarjeta (Azul) */
+.seguimiento-card:hover {
+    border-color: var(--primary) !important;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
+}
+
+/* Efecto cuando pasas el mouse sobre el botón de basura (Rojo) */
+.seguimiento-card.card-eliminar-hover {
+    border-color: var(--danger) !important;
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.15);
+}

@@ -572,11 +572,22 @@
         });
 
         $nuevoBloque.find("input[id^='Fecha']").removeClass('hasDatepicker').removeData('datepicker').unbind();
-        $nuevoBloque.find('#SpanSeguimiento' + mRegNew).text(mRegNew);
+        
+        // CORRECCIÓN AQUÍ: Agregamos la palabra "Seguimiento"
+        $nuevoBloque.find('#SpanSeguimiento' + mRegNew).text('Seguimiento ' + mRegNew);
+        
         $nuevoBloque.attr("id", "DivSeguimiento" + mRegNew);
         $nuevoBloque.show(); $nuevoBloque.appendTo('#DivSeguimientos');
         $("#Fecha" + mRegNew).datepicker({ dateFormat: 'dd/mm/yy', showOn: 'focus' });
     }
+
+    // --- NUEVOS EFECTOS HOVER ---
+    // Hover sobre el botón de la basura (Pinta la tarjeta de rojo)
+    $(document).on('mouseenter', '.btn-borrar-seguimiento', function() {
+        $(this).closest('.seguimiento-card').addClass('card-eliminar-hover');
+    }).on('mouseleave', '.btn-borrar-seguimiento', function() {
+        $(this).closest('.seguimiento-card').removeClass('card-eliminar-hover');
+    });
 
     function GrabarSeguimientos() {
         MostrarDatoObser('Procesando');

@@ -152,7 +152,7 @@ class NoConformidadController extends Controller
             $noConformidades = DB::select($Queri);
         }
 
-        return view('no-conformidad\index', compact(
+        return view('no-conformidad.index', compact(
             'gestiones', 'procesos', 'mTipoRegistro', 'noConformidades',
             'PuedeAdministrar', 'PuedeReversar', 'PuedeGeneral', 'PuedeCerrar', 'NomUsuario',
             'totalRegistros', 'regPorPagina', 'paginaActual', 'totalPaginas', 'offset', 'filtrar'
@@ -332,18 +332,44 @@ class NoConformidadController extends Controller
     private function renderBloqueSeguimiento($mRegistro, $RowNCS)
     {
         ?>
-        <div class="col-12 panel panel-primary nc-section mb-3" id="DivSeguimiento<?php echo $mRegistro; ?>">
+        <div class="col-12 panel panel-primary nc-section mb-3 seguimiento-card" id="DivSeguimiento<?php echo $mRegistro; ?>">
             <input name="Borrada<?php echo $mRegistro; ?>" type="hidden" id="Borrada<?php echo $mRegistro; ?>">
-            <div class="seguimiento-header d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
-                <span class="badge bg-primary rounded-pill px-3 py-1" id="SpanSeguimiento<?php echo $mRegistro; ?>">Seguimiento <?php echo $mRegistro; ?></span>
-                <button type="button" class="action-btn action-danger" id="BotBorrarSeguimiento<?php echo $mRegistro; ?>" onClick="BorrarSeguimiento(this);" title="Borrar"><i class="bi bi-trash3"></i></button>
+            
+            <!-- Encabezado con botón al lado -->
+            <div class="seguimiento-header d-flex align-items-center mb-3 pb-2 border-bottom gap-3">
+                <span class="badge bg-primary rounded-pill px-3 py-1 fs-6" id="SpanSeguimiento<?php echo $mRegistro; ?>">
+                    Seguimiento <?php echo $mRegistro; ?>
+                </span>
+                <button type="button" class="action-btn action-danger btn-borrar-seguimiento" id="BotBorrarSeguimiento<?php echo $mRegistro; ?>" onClick="BorrarSeguimiento(this);" title="Borrar este seguimiento">
+                    <i class="bi bi-trash3"></i>
+                </button>
             </div>
+
             <div class="row g-3">
-                <div class="col-md-6 form-group"><label class="label-xsmall">Objetivo principal</label><textarea name="Accion<?php echo $mRegistro; ?>" id="Accion<?php echo $mRegistro; ?>" class="form-control" rows="2"><?php echo $RowNCS['Accion']; ?></textarea></div>
-                <div class="col-md-6 form-group"><label class="label-xsmall">Resultado Esperado</label><textarea name="Resultado<?php echo $mRegistro; ?>" id="Resultado<?php echo $mRegistro; ?>" class="form-control" rows="2"><?php echo $RowNCS['Resultado']; ?></textarea></div>
-                <div class="col-md-3 form-group"><label class="label-xsmall">Fecha Seguimiento:</label><input type="text" name="Fecha<?php echo $mRegistro; ?>" id="Fecha<?php echo $mRegistro; ?>" class="form-control" placeholder="dd/mm/aaaa" value="<?php echo self::darFecha($RowNCS['Fecha']); ?>"></div>
-                <div class="col-md-6 form-group"><label class="label-xsmall">Realizado Por:</label><input type="text" name="RealizadoPor<?php echo $mRegistro; ?>" id="RealizadoPor<?php echo $mRegistro; ?>" class="form-control" value="<?php echo $RowNCS['RealizadoPor']; ?>"></div>
-                <div class="col-md-3 form-group"><label class="label-xsmall">Alcanzado:</label><select name="Alcanzado<?php echo $mRegistro; ?>" class="form-select" id="Alcanzado<?php echo $mRegistro; ?>"><option value="0" selected>...</option><option value="1" <?php if ($RowNCS["Alcanzado"] == 1) echo "selected"; ?>>SI</option><option value="-1" <?php if ($RowNCS["Alcanzado"] == -1) echo "selected"; ?>>NO</option></select></div>
+                <div class="col-md-6 form-group">
+                    <label class="label-xsmall">Objetivo principal del plan de Acción</label>
+                    <textarea name="Accion<?php echo $mRegistro; ?>" id="Accion<?php echo $mRegistro; ?>" class="form-control" placeholder="Objetivo principal del plan de Acción" rows="2"><?php echo $RowNCS['Accion']; ?></textarea>
+                </div>
+                <div class="col-md-6 form-group">
+                    <label class="label-xsmall">Resultado Esperado</label>
+                    <textarea name="Resultado<?php echo $mRegistro; ?>" id="Resultado<?php echo $mRegistro; ?>" class="form-control" placeholder="Resultado Esperado" rows="2"><?php echo $RowNCS['Resultado']; ?></textarea>
+                </div>
+                <div class="col-md-3 form-group">
+                    <label class="label-xsmall">Fecha Seguimiento:</label>
+                    <input type="text" name="Fecha<?php echo $mRegistro; ?>" id="Fecha<?php echo $mRegistro; ?>" class="form-control" placeholder="dd/mm/aaaa" onChange="ValidarFecha(this)" onBlur="ValidarFecha(this)" value="<?php echo self::darFecha($RowNCS['Fecha']); ?>">
+                </div>
+                <div class="col-md-6 form-group">
+                    <label class="label-xsmall">Realizado Por:</label>
+                    <input type="text" name="RealizadoPor<?php echo $mRegistro; ?>" id="RealizadoPor<?php echo $mRegistro; ?>" class="form-control" value="<?php echo $RowNCS['RealizadoPor']; ?>">
+                </div>
+                <div class="col-md-3 form-group">
+                    <label class="label-xsmall">Alcanzado:</label>
+                    <select name="Alcanzado<?php echo $mRegistro; ?>" class="form-select" id="Alcanzado<?php echo $mRegistro; ?>">
+                        <option value="0" selected>...</option>
+                        <option value="1" <?php if ($RowNCS["Alcanzado"] == 1) echo "selected"; ?>>SI</option>
+                        <option value="-1" <?php if ($RowNCS["Alcanzado"] == -1) echo "selected"; ?>>NO</option>
+                    </select>
+                </div>
             </div>
         </div>
         <?php
