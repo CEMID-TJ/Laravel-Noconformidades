@@ -115,8 +115,8 @@
                         <tr>
                             <th width="10%">Fecha / ID solicitud</th>
                             <th width="17%">Responsable Apertura</th>
-                            <th width="7%">Proceso</th>
-                            <th width="46%">Descripción</th>
+                            <th width="12%">Proceso</th>       <!-- Antes 7% -->
+                            <th width="41%">Descripción</th>   <!-- Antes 46% -->
                             <th width="10%">Detectada en</th>
                             <th width="10%">Acciones</th>
                         </tr>

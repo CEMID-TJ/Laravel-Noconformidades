@@ -1,6 +1,7 @@
 /* =======================================================
    PROYECTO: Manejo de No Conformidades y Mejoras
-   ARCHIVO: public/css/noconformidades.css
+   ARCHIVO: public/css/no-conformidad.css
+   DESCRIPCIÓN: Hoja de estilos principal del módulo.
    ======================================================= */
 
 /* ===== 1. VARIABLES GLOBALES Y RESETEO ===== */
@@ -26,20 +27,40 @@
     --shadow-sm: 0 1px 3px rgba(11, 19, 34, .08);
     --shadow: 0 4px 14px rgba(11, 19, 34, .10);
     --shadow-lg: 0 20px 60px rgba(11, 19, 34, .25);
-    --navbar-height: 112px; /* Altura aproximada del menú fijo */
+    --navbar-height: 112px;
 }
 
-html { background: var(--bg-body); overflow-y: scroll !important; scrollbar-gutter: stable; }
+/* CANDADO 1: Forzar que la barra de scroll del navegador SIEMPRE esté visible.
+   Así, cuando se abra un modal, el ancho de la pantalla no cambiará ni un píxel. */
+html { 
+    background: var(--bg-body); 
+    overflow-y: scroll !important; 
+    scrollbar-gutter: stable; 
+}
+    
 body {
     background: var(--bg-body);
     color: var(--text);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Roboto, sans-serif;
     font-size: 14px;
     line-height: 1.5;
-    padding-top: var(--navbar-height); /* Evita que el menú tape el contenido */
+    padding-top: var(--navbar-height);
 }
-body.modal-open { padding-right: 0 !important; }
-.container-main { width: 96%; max-width: 1600px; margin: 0 auto; background: transparent; padding: 14px 16px 0 16px; }
+
+/* CANDADO 2: Evitar que Bootstrap modifique el body al abrir modales.
+   Como ya forzamos el scroll en el HTML, no necesitamos que Bootstrap agregue padding. */
+body.modal-open {
+    padding-right: 0 !important; 
+    overflow: hidden !important; 
+}
+
+.container-main { 
+    width: 96%; 
+    max-width: 1600px; 
+    margin: 0 auto; 
+    background: transparent; 
+    padding: 14px 16px 0 16px; 
+}
 
 /* ===== 2. NAVBAR FIJA Y FILTROS ===== */
 .navbar-default {
@@ -50,6 +71,11 @@ body.modal-open { padding-right: 0 !important; }
     min-height: 64px;
     z-index: 1030;
 }
+/* Ajuste del menú al abrir modales para que no se estire */
+body.modal-open .navbar-default.fixed-top {
+    padding-right: calc(24px + var(--bs-scrollbar-width, 0px)) !important;
+}
+
 .navbar-top-bar { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 6px; }
 .navbar-brand-custom {
     color: var(--text) !important; font-weight: 700; font-size: 15px; display: inline-flex;
@@ -80,7 +106,7 @@ textarea.form-control { height: auto !important; min-height: 80px; resize: verti
 label { font-weight: 700; font-size: 11.5px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px !important; display: inline-flex; align-items: center; gap: 5px; }
 .btn { border-radius: 8px; font-weight: 600; font-size: 13px; padding: 8px 16px; display: inline-flex; align-items: center; gap: 6px; }
 
-/* ===== 4. TABLA Y STICKY HEADER (LA SOLUCIÓN AL SALTO) ===== */
+/* ===== 4. TABLA Y STICKY HEADER ===== */
 .tableFixHead {
     position: relative;
     background: #ffffff;
@@ -89,15 +115,25 @@ label { font-weight: 700; font-size: 11.5px; color: var(--text-muted); text-tran
     box-shadow: 0 4px 14px rgba(11, 19, 34, .10);
     padding: 0;
     margin: 0 0 15px 0;
-    /* Scroll interno para no afectar la ventana al abrir modales */
     max-height: calc(100vh - 250px); 
     overflow-y: auto;
     display: block;
+    /* CANDADO 3: Reserva el espacio del scroll interno de la tabla para que su ancho no cambie */
+    scrollbar-gutter: stable;
 }
-.tableFixHead table { width: 100%; margin: 0; border-collapse: separate !important; border-spacing: 0 !important; --bs-table-striped-bg: transparent !important; }
+
+.tableFixHead table { 
+    width: 100%; 
+    margin: 0; 
+    border-collapse: separate !important; 
+    border-spacing: 0 !important; 
+    --bs-table-striped-bg: transparent !important; 
+    table-layout: fixed; /* Obliga a respetar los porcentajes de los TH */
+}
+
 .tableFixHead thead th {
     position: sticky;
-    top: 0; /* Se pega a la caja, no a la ventana */
+    top: 0; 
     z-index: 10;
     background-color: #eef2f7 !important;
     color: #1e293b !important;
@@ -106,10 +142,21 @@ label { font-weight: 700; font-size: 11.5px; color: var(--text-muted); text-tran
     border-top: none !important; border-left: none !important;
     border-bottom: 1.5px solid #b7c3d2 !important; border-right: 1px solid #cbd5e1 !important;
     padding: 14px 16px !important;
+    white-space: normal; 
+    word-wrap: break-word; 
 }
 .tableFixHead thead th:first-child { border-top-left-radius: 12.5px; }
 .tableFixHead thead th:last-child { border-top-right-radius: 12.5px; border-right: none !important; }
-.tableFixHead tbody td { text-align: left; color: #0b1322 !important; border-top: none !important; border-left: none !important; border-bottom: 1px solid #cbd5e1 !important; border-right: 1px solid #cbd5e1 !important; vertical-align: middle; line-height: 1.4; padding: 12px 16px !important; font-size: 13px; transition: background-color .12s ease; }
+
+.tableFixHead tbody td { 
+    text-align: left; color: #0b1322 !important; border-top: none !important; border-left: none !important; 
+    border-bottom: 1px solid #cbd5e1 !important; border-right: 1px solid #cbd5e1 !important; 
+    vertical-align: middle; line-height: 1.4; padding: 12px 16px !important; font-size: 13px; 
+    transition: background-color .12s ease; 
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+}
 .tableFixHead tbody td:last-child { border-right: none !important; white-space: nowrap; }
 .tableFixHead tbody tr:nth-of-type(even) td { background-color: #ffffff !important; }
 .tableFixHead tbody tr:nth-of-type(odd) td { background-color: #fafbfc !important; }
@@ -146,7 +193,7 @@ label { font-weight: 700; font-size: 11.5px; color: var(--text-muted); text-tran
 @media (max-width: 767px) {
     body { font-size: 13px; }
     .container-main { width: 100%; padding: 10px 8px 0 8px; }
-    .tableFixHead { max-height: none; border: none; border-radius: 0; box-shadow: none; background: transparent; margin-bottom: 10px; overflow: visible; }
+    .tableFixHead { max-height: none; border: none; border-radius: 0; box-shadow: none; background: transparent; margin-bottom: 10px; overflow: visible; scrollbar-gutter: auto; }
     .tableFixHead thead { display: none; }
     .tableFixHead table, .tableFixHead tbody, .tableFixHead tr, .tableFixHead td { display: block; width: 100%; }
     .tableFixHead tbody tr { background: #fff !important; border: 1.5px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; box-shadow: var(--shadow-sm); }
