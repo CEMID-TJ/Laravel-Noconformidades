@@ -3,21 +3,33 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\NoConformidadController;
 
-// Vista principal y filtrado de la tabla
-Route::get('/', [NoConformidadController::class, 'index'])->name('noconformidades.index');
-Route::get('/noconformidades', [NoConformidadController::class, 'index']);
+// Ruta raíz (Redirige al módulo de no conformidades por ahora)
+Route::get('/', function () {
+    return redirect('/noconformidades');
+});
 
-// Rutas AJAX (Equivalentes a los bloques if/elseif de TipoModificar en tu script original)
-Route::get('/noconformidades/mostrar', [NoConformidadController::class, 'mostrar']);
-Route::get('/noconformidades/editar', [NoConformidadController::class, 'editar']);
-Route::post('/noconformidades/grabar', [NoConformidadController::class, 'grabar']);
+// Agrupación de rutas para el módulo No Conformidades
+Route::prefix('noconformidades')->name('noconformidades.')->group(function () {
+    
+    // 1. Listado principal
+    Route::get('/', [NoConformidadController::class, 'index'])->name('index');
+    
+    // 2. CRUD (Crear, Editar, Guardar, Consultar)
+    Route::get('/mostrar/{id}', [NoConformidadController::class, 'show'])->name('show');
+    Route::get('/editar/{id}', [NoConformidadController::class, 'edit'])->name('edit');
+    Route::post('/guardar', [NoConformidadController::class, 'store'])->name('store');
 
-Route::get('/noconformidades/seguimientos', [NoConformidadController::class, 'obtenerSeguimientos']);
-Route::post('/noconformidades/seguimientos', [NoConformidadController::class, 'grabarSeguimientos']);
+    // 3. Seguimientos
+    Route::get('/seguimientos/{id}', [NoConformidadController::class, 'getSeguimientos'])->name('seguimientos.get');
+    Route::post('/seguimientos', [NoConformidadController::class, 'saveSeguimientos'])->name('seguimientos.save');
 
-Route::get('/noconformidades/cierre', [NoConformidadController::class, 'obtenerCierre']);
-Route::post('/noconformidades/cierre', [NoConformidadController::class, 'grabarCierre']);
+    // 4. Cierre
+    Route::get('/cierre/{id}', [NoConformidadController::class, 'getCierre'])->name('cierre.get');
+    Route::post('/cierre', [NoConformidadController::class, 'saveCierre'])->name('cierre.save');
 
-Route::get('/noconformidades/procesos', [NoConformidadController::class, 'cambioGestionProceso']);
-Route::get('/noconformidades/reportes', [NoConformidadController::class, 'enviarReportes']);
-Route::post('/noconformidades/reversar', [NoConformidadController::class, 'reversar']);
+    // 5. Auxiliares (Procesos, Reportes, Reversar)
+    Route::get('/procesos/{id}', [NoConformidadController::class, 'getProcesos'])->name('procesos');
+    Route::get('/reportes', [NoConformidadController::class, 'generateReport'])->name('reportes');
+    Route::post('/reversar', [NoConformidadController::class, 'revert'])->name('reversar');
+    
+});
