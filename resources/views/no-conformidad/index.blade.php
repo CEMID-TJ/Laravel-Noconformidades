@@ -22,13 +22,17 @@
 
     <!-- 2. ESTILOS PERSONALIZADOS -->
     <link rel="stylesheet" href="{{ asset('css/no-conformidad.css') }}">
+    
+    <!-- 3. SCRIPTS GLOBALES -->
+    <script src="{{ asset('js/global.js') }}"></script>
 </head>
 
 <body @if(request('DatoObser')) onLoad="MostrarDatoObser('{{ request('DatoObser') }}', true);" @endif>
 
-<div class="myAlert-top" id="DatoObser" style="display:none"><b>Danger!</b> ...</div>
+<!-- Inclusión de la Alerta Global -->
+@include('partials.alerts')
 
-<!-- 3. NAVBAR Y FILTROS -->
+<!-- 4. NAVBAR Y FILTROS -->
 <nav class="navbar-default fixed-top" role="navigation">
     <div class="navbar-top-bar">
         <a class="navbar-brand-custom" href="{{ url('/noconformidades') }}">
@@ -104,7 +108,7 @@
     </div>
 </nav>
 
-<!-- 4. CONTENIDO PRINCIPAL (TABLA) -->
+<!-- 5. CONTENIDO PRINCIPAL (TABLA) -->
 <div class="container-main">
     @if($filtrar == 1)
     <div class="row sidenav">
@@ -115,8 +119,8 @@
                         <tr>
                             <th width="10%">Fecha / ID solicitud</th>
                             <th width="17%">Responsable Apertura</th>
-                            <th width="12%">Proceso</th>       <!-- Antes 7% -->
-                            <th width="41%">Descripción</th>   <!-- Antes 46% -->
+                            <th width="12%">Proceso</th>
+                            <th width="41%">Descripción</th>
                             <th width="10%">Detectada en</th>
                             <th width="10%">Acciones</th>
                         </tr>
@@ -168,7 +172,7 @@
                 </table>
             </div>
 
-            <!-- 5. PAGINACIÓN -->
+            <!-- 6. PAGINACIÓN -->
             @if(isset($totalRegistros) && $totalRegistros > 0)
             @php
                 $urlPagina = function ($n) { return request()->fullUrlWithQuery(['Filtrar' => 1, 'pagina' => $n]); };
@@ -199,7 +203,7 @@
 </div>
 
 <!-- ========================================== -->
-<!-- 6. MODALES (Formularios Emergentes)        -->
+<!-- 7. MODALES ESPECÍFICOS DEL MÓDULO           -->
 <!-- ========================================== -->
 
 <!-- MODAL CONSULTA -->
@@ -217,7 +221,10 @@
 <div class="modal fade" id="ModalEditarNoConformidad" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-scrollable modal-xl" style="max-width:98%">
         <div class="modal-content">
-            <div class="modal-header"><h3 class="modal-title"><i class="bi bi-pencil-square"></i> Editar / Crear No Conformidad</h3><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+            <div class="modal-header">
+                <h3 class="modal-title" id="TituloModalNoConformidad"><i class="bi bi-pencil-square"></i> Editar / Crear No Conformidad</h3>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
             <div class="modal-body" id="DivBodyNoConformidad">
                 <form method="post" enctype="multipart/form-data" class="form_validar" name="FrmNoConformidad" id="FrmNoConformidad" autocomplete="off">
                     <input name="TipoGrabar" type="hidden" id="TipoGrabar">
@@ -254,10 +261,24 @@
                                 <div class="form-group"><label>Causas o Ventajas</label><textarea name="Causas" id="Causas" class="form-control" rows="3"></textarea></div>
                                 <div class="form-group"><label>Objetivo principal</label><textarea name="Accion" id="Accion" class="form-control" rows="3"></textarea></div>
                                 <div class="form-group"><label>Fecha acordada revisión</label><input type="text" name="FRevision" id="FRevision" class="form-control"></div>
+                                
+                                <!-- INPUT DE ARCHIVO NATIVO DE BOOTSTRAP -->
                                 <div class="form-group">
-                                    <label class="btn btn-default btn-file modern-file-input" id="BtnFileNoConformidad" for="FileNoConformidad" style="display:flex!important;cursor:pointer;"><span id="SpanFileNoConformidad"><i class="bi bi-file-earmark-pdf"></i> Adjuntar PDF</span></label>
-                                    <input name="FileNoConformidad" id="FileNoConformidad" type="file" accept="application/pdf" onChange="MostrarNombreArchivo(this)" style="display:none;">
+                                <label>Documento Adjunto</label>
+                                    <!-- Botón de Bootstrap nativo -->
+                                    <label for="FileNoConformidad" class="btn btn-upload-file w-100 d-flex align-items-center justify-content-center gap-2 py-2" id="LabelFileNoConformidad">
+                                        <i class="bi bi-file-earmark-pdf-fill fs-5"></i>
+                                        <span id="SpanFileNoConformidad">Seleccionar archivo PDF</span>
+                                    </label>
+                                    
+                                    <!-- Input real (oculto con la clase d-none) -->
+                                    <input type="file" id="FileNoConformidad" name="FileNoConformidad" class="d-none" accept="application/pdf" onChange="ValidarArchivo(this)">
+                                    
+                                    <small class="text-muted d-block mt-1" style="font-size: 11px;">
+                                        Máximo 4MB. Si ya hay uno cargado, se reemplazará.
+                                    </small>
                                 </div>
+                                
                             </div>
                         </div>
                     </div>
@@ -265,7 +286,7 @@
             </div>
             <div class="modal-footer" id="BotsNoConformidad">
                 <button type="button" class="btn btn-danger" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i> Cerrar</button>
-                <button type="button" class="btn btn-success" onClick="GrabarNoConformidad();"><i class="bi bi-check2"></i> Aceptar</button>
+                <button type="button" class="btn btn-success" id="BtnAceptarNoConformidad" onClick="GrabarNoConformidad();"><i class="bi bi-check2"></i> Aceptar</button>
             </div>
         </div>
     </div>
@@ -345,7 +366,7 @@
 </div>
 
 <!-- ========================================== -->
-<!-- 7. SCRIPTS (JAVASCRIPT)                    -->
+<!-- 8. SCRIPTS ESPECÍFICOS DEL MÓDULO          -->
 <!-- ========================================== -->
 <script>
     $.ajaxSetup({ headers: { 'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content') } });
@@ -369,43 +390,38 @@
         $('#TipoReporte, #ReportProceso').select2({ language: 'es', dropdownParent: $('#ModalReportes'), width: '100%' });
     });
 
-    function MostrarDatoObser(msg, mTipo) {
-        var el = document.getElementById('DatoObser');
-        var cls = (mTipo === true || mTipo === 'success') ? 'alert-success' : (mTipo === 'info' ? 'alert-info' : 'alert-danger');
-        el.className = 'myAlert-top ' + cls; if (msg) el.innerHTML = msg;
-        $("#DatoObser").show(); setTimeout(() => $("#DatoObser").hide(), 3000);
-    }
-
     function ValidarFiltros() { document.FrmFiltrar.submit(); }
 
-    function MostrarNombreArchivo(input) {
+    // Valida el archivo nativo de Bootstrap al seleccionarlo
+    function ValidarArchivo(input) {
+        var file = input.files[0];
         var span = document.getElementById('SpanFileNoConformidad');
-        if (!span) return;
-        if (input.files && input.files.length > 0) {
-            var nombre = input.files[0].name;
-            if (nombre.length > 45) { nombre = nombre.substring(0, 42) + '...'; }
-            span.innerHTML = '<i class="bi bi-file-earmark-check"></i> ' + nombre;
-            var contenedor = document.getElementById('BtnFileNoConformidad');
-            if (contenedor) contenedor.classList.add('archivo-cargado');
-        } else { ResetearArchivoNC(); }
-    }
+        var label = document.getElementById('LabelFileNoConformidad');
 
-    function ResetearArchivoNC() {
-        var span = document.getElementById('SpanFileNoConformidad');
-        var input = document.getElementById('FileNoConformidad');
-        var btn = document.getElementById('BtnFileNoConformidad');
-        if (span) { span.innerHTML = '<i class="bi bi-file-earmark-pdf"></i> Adjuntar archivo PDF (máx. 4MB)'; }
-        if (btn) { btn.classList.remove('archivo-cargado'); }
-        if (input) { input.value = ''; input.dataset.yacargado = 0; }
-    }
+        if (!file) {
+            span.innerHTML = 'Seleccionar archivo PDF';
+            label.classList.remove('archivo-cargado'); // Quitar verde
+            return;
+        }
 
-    function MarcarArchivoYaCargado() {
-        var span = document.getElementById('SpanFileNoConformidad');
-        var input = document.getElementById('FileNoConformidad');
-        var btn = document.getElementById('BtnFileNoConformidad');
-        if (span) { span.innerHTML = '<i class="bi bi-file-earmark-check"></i> Archivo PDF ya cargado — seleccione uno nuevo'; }
-        if (btn) { btn.classList.add('archivo-cargado'); }
-        if (input) input.dataset.yacargado = 1;
+        if (file.type !== "application/pdf") {
+            MostrarDatoObser("¡Error! Solo se admiten archivos en formato PDF");
+            input.value = ''; 
+            span.innerHTML = 'Seleccionar archivo PDF';
+            return;
+        }
+        if (file.size > 4 * 1024 * 1024) {
+            MostrarDatoObser("¡Error! El archivo supera el tamaño máximo permitido (4MB)");
+            input.value = ''; 
+            span.innerHTML = 'Seleccionar archivo PDF';
+            return;
+        }
+
+        var nombre = file.name;
+        if (nombre.length > 35) nombre = nombre.substring(0, 32) + '...';
+        span.innerHTML = nombre;
+        
+        label.classList.add('archivo-cargado'); // Poner verde
     }
 
     function ScrollAlPrimerError(contenedor) {
@@ -434,9 +450,18 @@
         document.getElementById('NumeroNC').value = mNumeroNC;
         $("#FrmNoConformidad").find("input:text,select,textarea").removeClass("alert-danger");
         $("#BotsNoConformidad").show();
-        ResetearArchivoNC();
+        
+        // Reseteamos el botón del archivo al estado inicial
+        document.getElementById('FileNoConformidad').value = '';
+        var labelFile = document.getElementById('LabelFileNoConformidad');
+        var spanFile = document.getElementById('SpanFileNoConformidad');
+        labelFile.classList.remove('archivo-cargado');
+        spanFile.innerHTML = 'Seleccionar archivo PDF';
 
         if (mNumeroNC == 'Nuevo') {
+            $("#TituloModalNoConformidad").html('<i class="bi bi-plus-circle"></i> Crear Nueva No Conformidad');
+            $("#BtnAceptarNoConformidad").html('<i class="bi bi-check2"></i> Crear Registro');
+
             document.getElementById('Responsable').value = '{{ $NomUsuario }}';
             document.getElementById('FApertura').value = '{{ date("d/m/Y") }}';
             $('#DivDetectadaEnOtra, #DivRequiereAC, #DivNumeroNCAccionCorrectiva').hide();
@@ -444,6 +469,9 @@
             $('#CodGestion, #Proceso, #Tipo, #DetectadaEn, #RequiereAC').val('').trigger('change');
             $("#ModalEditarNoConformidad").modal('show');
         } else {
+            $("#TituloModalNoConformidad").html('<i class="bi bi-pencil-square"></i> Editar No Conformidad #' + mNumeroNC);
+            $("#BtnAceptarNoConformidad").html('<i class="bi bi-save"></i> Guardar Cambios');
+
             $.ajax({
                 type: "GET", url: "{{ url('/noconformidades/editar') }}/" + mNumeroNC, dataType: "json", cache: false
             }).done(function (data) {
@@ -463,7 +491,13 @@
                 document.getElementById('Causas').value = data.Causas || '';
                 document.getElementById('Accion').value = data.Accion || '';
                 document.getElementById('FRevision').value = data.FRevision || '';
-                if (data.YaCargado === 1) { MarcarArchivoYaCargado(); }
+                
+                // Si ya hay PDF, ponerlo verde con nuestra nueva clase
+                if (data.YaCargado === 1) { 
+                    spanFile.innerHTML = 'Reemplazar PDF existente';
+                    labelFile.classList.add('archivo-cargado'); 
+                }
+                
                 $("#ModalEditarNoConformidad").modal('show');
             });
         }
@@ -488,13 +522,7 @@
             if (!$("#NumeroNCAccionCorrectiva").val() || $("#NumeroNCAccionCorrectiva").val().trim() === '') { mRetorno = false; $("#NumeroNCAccionCorrectiva").addClass("alert-danger"); }
             else { $("#NumeroNCAccionCorrectiva").removeClass("alert-danger"); }
         }
-        if (mRetorno) {
-            var input = document.getElementById("FileNoConformidad");
-            if (input.files.length > 0) {
-                if (!(input.files[0].type == "application/pdf")) { $("#BotsNoConformidad").show(); MostrarDatoObser("¡Error! Solo se admiten archivos en formato PDF"); return false; }
-                if (input.files[0].size > 4 * 1024 * 1024) { $("#BotsNoConformidad").show(); MostrarDatoObser("¡Error! El archivo supera el tamaño máximo (4MB)"); return false; }
-            }
-        }
+        
         if (mRetorno) {
             document.FrmNoConformidad.TipoGrabar.value = 'GrabarNoConformidad';
             var f = new FormData(document.getElementById('FrmNoConformidad'));
