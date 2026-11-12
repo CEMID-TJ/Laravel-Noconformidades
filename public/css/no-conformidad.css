@@ -1,7 +1,6 @@
 /* =======================================================
    PROYECTO: Manejo de No Conformidades y Mejoras
    ARCHIVO: public/css/no-conformidad.css
-   DESCRIPCIÓN: Hoja de estilos principal del módulo.
    ======================================================= */
 
 /* ===== 1. VARIABLES GLOBALES Y RESETEO ===== */
@@ -367,26 +366,32 @@ label {
     font-weight: 600;
 }
 
+/* --- ACCIONES EN LA TABLA --- */
 .acciones-cell {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 5px;
-    flex-wrap: wrap;
+    gap: 8px;
+    flex-wrap: nowrap;
 }
 
 .action-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    width: 30px;
-    height: 30px;
+    width: 32px;
+    height: 32px;
     border-radius: 8px;
-    font-size: 14px;
+    font-size: 15px;
     cursor: pointer;
     transition: all 0.15s;
     border: 1px solid transparent;
     text-decoration: none !important;
+}
+
+.action-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
 }
 
 .action-edit {
@@ -928,19 +933,16 @@ label {
 .seguimiento-card {
     transition: border-color 0.3s ease, box-shadow 0.3s ease;
     border: 1.5px solid var(--border-soft) !important;
-    /* AGREGA ESTA LÍNEA PARA AMPLIAR EL ESPACIO INTERNO */
     padding: 24px 28px !important; 
     border-radius: 12px;
     background-color: #ffffff;
 }
 
-/* Efecto cuando pasas el mouse sobre la tarjeta (Azul) */
 .seguimiento-card:hover {
     border-color: var(--primary) !important;
     box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
 }
 
-/* Efecto cuando pasas el mouse sobre el botón de basura (Rojo) */
 .seguimiento-card.card-eliminar-hover {
     border-color: var(--danger) !important;
     box-shadow: 0 4px 12px rgba(220, 38, 38, 0.15);
