@@ -173,75 +173,185 @@ class NoConformidadController extends Controller
         if (empty($results)) { return response("<b>No existe</b>"); }
         $Row = (array) $results[0];
 
+        $val = function ($valor) {
+            return trim((string) $valor) !== '' ? $valor : '<span class="nc-detail-empty">—</span>';
+        };
+        $esCerrada = (!empty($Row['FCierre']) && $Row['FCierre'] > '0000-00-00');
+        $tipoTexto = trim((string) $Row['Tipo']);
+        if (!empty($mTipoRegistro[$Row['Tipo']])) {
+            $tipoTexto .= ' · ' . $mTipoRegistro[$Row['Tipo']];
+        }
+        $requiereAC = $Row['RequiereAC'] == 1 ? 'Sí' : ($Row['RequiereAC'] == -1 ? 'No' : '—');
+        $pdfPath = public_path("Archivos/NoConformidades/" . trim($numNC) . ".pdf");
+        $tienePdf = file_exists($pdfPath);
+        $pdfUrl = $tienePdf ? asset("Archivos/NoConformidades/" . trim($numNC) . ".pdf") : '';
+        $descripcion = trim((string) $Row['Descripcion']);
+        $correccion = trim((string) $Row['Correccion']);
+        $causas = trim((string) $Row['Causas']);
+
         ob_start();
         ?>
-        <div class="col-sm-2 panel panel-default"><label class="label-xsmall fw-bold">Consecutivo:</label> <?php echo $Row['NumeroNC']; ?></div>
-        <div class="col-sm-4 panel panel-default"><label class="label-xsmall fw-bold">Responsable de la apertura:</label> <?php echo $Row['NomResponsable']; ?></div>
-        <div class="col-sm-6 panel panel-default"><label class="label-xsmall fw-bold">Tipo:</label> <?php echo $Row['Tipo'] . ' - ' . ($mTipoRegistro[$Row['Tipo']] ?? ''); ?></div>
-        <div class="clearfix"></div>
-        <div class="col-sm-3 panel panel-default"><label class="label-xsmall fw-bold">Gestión:</label> <?php echo $Row['NomGestion']; ?></div>
-        <div class="col-sm-3 panel panel-default"><label class="label-xsmall fw-bold">Proceso:</label> <?php echo $Row['Proceso']; ?></div>
-        <div class="col-sm-3 panel panel-default"><label class="label-xsmall fw-bold">Fecha de apertura:</label> <?php echo self::darFecha($Row['FApertura']); ?></div>
-        <div class="col-sm-3 panel panel-default"><label class="label-xsmall fw-bold">Detectada en:</label> <?php echo $Row['DetectadaEn']; ?></div>
-        <div class="clearfix"></div>
-        <div class="col-sm-12 panel panel-default"><label class="label-xsmall fw-bold">Descripción:</label> <?php echo $Row['Descripcion']; ?></div>
-        <div class="clearfix"></div>
-        <div class="col-sm-12 panel panel-default"><label class="label-xsmall fw-bold">Relación de actividades:</label> <?php echo $Row['Correccion']; ?></div>
-        <?php if ($Row['Tipo'] == 'Corrección'): ?>
-            <div class="clearfix"></div>
-            <div class="col-sm-8 panel panel-default"><label class="label-xsmall fw-bold">Con la acción determinada se garantiza que la falla o posible materialización del riesgo no se presente de nuevo?:</label> <?php echo ($Row['RequiereAC'] == 1 ? 'Si' : ($Row['RequiereAC'] == -1 ? 'No' : '')); ?></div>
-            <?php if ($Row['RequiereAC'] == -1): ?>
-                <div class="col-sm-4 panel panel-default"><label class="label-xsmall fw-bold">ID de la acción correctiva vinculada:</label> <a style="cursor:pointer" onClick="MostrarDivConsultaNoConformidad(<?php echo $Row['NumeroNCAccionCorrectiva']; ?>);"><?php echo $Row['NumeroNC']; ?></a></div>
+        <div class="nc-detail">
+            <div class="nc-detail-head">
+                <div class="nc-detail-head-main">
+                    <div class="nc-detail-title-row">
+                        <span class="nc-detail-number">NC <?php echo $Row['NumeroNC']; ?></span>
+                        <span class="nc-detail-badge"><?php echo $tipoTexto !== '' ? $tipoTexto : 'Sin tipo'; ?></span>
+                        <span class="nc-detail-badge nc-detail-status <?php echo $esCerrada ? 'is-closed' : 'is-open'; ?>">
+                            <?php echo $esCerrada ? 'Cerrada' : 'Abierta'; ?>
+                        </span>
+                    </div>
+                </div>
+                <?php if ($tienePdf): ?>
+                    <a class="nc-detail-pdf" href="<?php echo $pdfUrl; ?>" target="_blank" rel="noopener">
+                        <i class="bi bi-file-earmark-pdf"></i> Ver adjunto
+                    </a>
+                <?php endif; ?>
+            </div>
+
+            <div class="nc-detail-meta">
+                <div class="nc-detail-field">
+                    <span class="nc-detail-label">Responsable de la apertura</span>
+                    <span class="nc-detail-value"><?php echo $val($Row['NomResponsable']); ?></span>
+                </div>
+                <div class="nc-detail-field">
+                    <span class="nc-detail-label">Gestión</span>
+                    <span class="nc-detail-value"><?php echo $val($Row['NomGestion']); ?></span>
+                </div>
+                <div class="nc-detail-field">
+                    <span class="nc-detail-label">Proceso</span>
+                    <span class="nc-detail-value"><?php echo $val($Row['Proceso']); ?></span>
+                </div>
+                <div class="nc-detail-field">
+                    <span class="nc-detail-label">Fecha de apertura</span>
+                    <span class="nc-detail-value"><?php echo $val(self::darFecha($Row['FApertura'])); ?></span>
+                </div>
+                <div class="nc-detail-field">
+                    <span class="nc-detail-label">Detectada en</span>
+                    <span class="nc-detail-value"><?php echo $val($Row['DetectadaEn']); ?></span>
+                </div>
+                <div class="nc-detail-field">
+                    <span class="nc-detail-label">Fecha acordada para la revisión</span>
+                    <span class="nc-detail-value"><?php echo $val(self::darFecha($Row['FRevision'])); ?></span>
+                </div>
+                <?php if ($Row['Tipo'] == 'Corrección'): ?>
+                    <div class="nc-detail-field nc-detail-field--wide">
+                        <span class="nc-detail-label">¿Se garantiza que la falla o posible materialización del riesgo no se presente de nuevo?</span>
+                        <span class="nc-detail-value"><?php echo $requiereAC; ?></span>
+                    </div>
+                    <?php if ($Row['RequiereAC'] == -1): ?>
+                        <div class="nc-detail-field">
+                            <span class="nc-detail-label">ID de la acción correctiva vinculada</span>
+                            <span class="nc-detail-value">
+                                <a class="link-modern" style="cursor:pointer" onClick="MostrarDivConsultaNoConformidad(<?php echo $Row['NumeroNCAccionCorrectiva']; ?>);"><?php echo $Row['NumeroNCAccionCorrectiva']; ?></a>
+                            </span>
+                        </div>
+                    <?php endif; ?>
+                <?php endif; ?>
+            </div>
+
+            <?php if ($descripcion !== ''): ?>
+                <section class="nc-detail-section">
+                    <h6 class="nc-detail-section-title">Descripción</h6>
+                    <div class="nc-detail-desc">
+                        <div class="nc-detail-text"><?php echo $Row['Descripcion']; ?></div>
+                    </div>
+                </section>
             <?php endif; ?>
-        <?php endif; ?>
-        <div class="clearfix"></div>
-        <div class="col-sm-9 panel panel-default"><label class="label-xsmall fw-bold">Causas o Ventajas:</label> <?php echo $Row['Causas']; ?></div>
-        <div class="col-sm-3 panel panel-default"><label class="label-xsmall fw-bold">Fecha acordada para la revisión:</label> <?php echo self::darFecha($Row['FRevision']); ?></div>
-        <div class="clearfix"></div>
-        <?php
-        $pdfPath = public_path("Archivos/NoConformidades/" . trim($numNC) . ".pdf");
-        if (file_exists($pdfPath)) {
-            $pdfUrl = asset("Archivos/NoConformidades/" . trim($numNC) . ".pdf");
-            $imgPdf = asset("imagenes/pdf.png");
-            echo "<a href='{$pdfUrl}' class='col-sm-12 btn btn-default btn-file' title='Ver Archivo Adjunto' target='_blank'><img src='{$imgPdf}' border='0'>Ver Archivo Adjunto</a>";
-        }
-        ?>
-        <div class="clearfix"></div>
-        <?php
-        $condBorrada = $PuedeAdministrar ? "" : "AND Borrada=0";
-        $ResultNCS = DB::select("SELECT NCS.* FROM calidad.ncseguimiento NCS WHERE NumeroNC = ? {$condBorrada} ORDER BY ConsecutivoS", [$numNC]);
-        if (count($ResultNCS) > 0): ?>
-            <div class="col-sm-12 panel panel-primary mt-3">
-                <h5><b>SEGUIMIENTOS</b></h5>
-                <div class="row">
-                <?php foreach ($ResultNCS as $rNCS): $RowNCS = (array) $rNCS; ?>
-                    <div class="col-sm-6 panel panel-default"><label class="label-xsmall fw-bold">(<?php echo $RowNCS["ConsecutivoS"]; ?>)Acción</label> <?php echo ($RowNCS['Borrada'] ? ('<b style="background:red">BORRADA ' . $RowNCS['Accion'] . '</b>') : $RowNCS['Accion']); ?></div>
-                    <div class="col-sm-6 panel panel-default"><label class="label-xsmall fw-bold">Resultado Esperado</label> <?php echo $RowNCS['Resultado']; ?></div>
-                    <div class="clearfix"></div>
-                    <div class="col-sm-3 panel panel-default"><label class="label-xsmall fw-bold">Fecha Apertura:</label> <?php echo self::darFechaHora($RowNCS["FHSeguimiento"], 3); ?></div>
-                    <div class="col-sm-3 panel panel-default"><label class="label-xsmall fw-bold">Fecha Seguimiento:</label> <?php echo self::darFecha($RowNCS["Fecha"]); ?></div>
-                    <div class="col-sm-4 panel panel-default"><label class="label-xsmall fw-bold">Realizado Por:</label> <?php echo $RowNCS["RealizadoPor"]; ?></div>
-                    <div class="col-sm-2 panel panel-default"><label class="label-xsmall fw-bold">Alcanzado:</label> <?php echo ($RowNCS["Alcanzado"] == 1 ? "Si" : ($RowNCS["Alcanzado"] == -1 ? "No" : "")); ?></div>
-                    <div class="clearfix mb-2 border-bottom"></div>
-                <?php endforeach; ?>
-                </div>
-            </div>
-        <?php endif; ?>
 
-        <?php if (!empty($Row['FCierre']) && $Row['FCierre'] > '0000-00-00'): ?>
-            <div class="col-sm-12 panel panel-primary mt-3">
-                <h5><b>DATOS DEL CIERRE</b></h5>
-                <div class="row">
-                    <div class="col-sm-6 panel panel-default"><label class="label-xsmall fw-bold">Resultados de la revisión:</label> <?php echo $Row['ResultadoRevision']; ?></div>
-                    <div class="col-sm-6 panel panel-default"><label class="label-xsmall fw-bold">Motivos del Cierre:</label> <?php echo $Row['MotivoCierre']; ?></div>
-                    <div class="clearfix"></div>
-                    <div class="col-sm-6 panel panel-default"><label class="label-xsmall fw-bold">Nueva Acción?:</label> <?php echo $Row['NuevaAccion']; ?></div>
-                    <div class="col-sm-2 panel panel-default"><label class="label-xsmall fw-bold">Fecha del Cierre:</label> <?php echo self::darFecha($Row['FCierre']); ?></div>
-                    <div class="col-sm-4 panel panel-default"><label class="label-xsmall fw-bold">Responsable del Cierre:</label> <?php echo $Row['RCierre']; ?></div>
+            <?php if ($correccion !== '' || $causas !== ''): ?>
+                <div class="nc-detail-columns">
+                    <?php if ($correccion !== ''): ?>
+                        <section class="nc-detail-section">
+                            <h6 class="nc-detail-section-title">Relación de actividades</h6>
+                            <div class="nc-detail-text"><?php echo $Row['Correccion']; ?></div>
+                        </section>
+                    <?php endif; ?>
+                    <?php if ($causas !== ''): ?>
+                        <section class="nc-detail-section">
+                            <h6 class="nc-detail-section-title">Causas o ventajas</h6>
+                            <div class="nc-detail-text"><?php echo $Row['Causas']; ?></div>
+                        </section>
+                    <?php endif; ?>
                 </div>
-            </div>
-        <?php endif;
+            <?php endif; ?>
 
+            <?php
+            $condBorrada = $PuedeAdministrar ? "" : "AND Borrada=0";
+            $ResultNCS = DB::select("SELECT NCS.* FROM calidad.ncseguimiento NCS WHERE NumeroNC = ? {$condBorrada} ORDER BY ConsecutivoS", [$numNC]);
+            if (count($ResultNCS) > 0): ?>
+                <section class="nc-detail-section">
+                    <h6 class="nc-detail-section-title">Seguimientos</h6>
+                    <div class="nc-followups">
+                        <?php foreach ($ResultNCS as $rNCS): $RowNCS = (array) $rNCS; ?>
+                            <article class="nc-followup">
+                                <div class="nc-followup-head">
+                                    <span class="nc-followup-title">Seguimiento <?php echo $RowNCS['ConsecutivoS']; ?></span>
+                                    <?php if ($RowNCS['Borrada']): ?>
+                                        <span class="nc-detail-badge nc-detail-badge-danger">Borrada</span>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="nc-followup-grid">
+                                    <div class="nc-detail-field nc-detail-field--full">
+                                        <span class="nc-detail-label">Acción</span>
+                                        <span class="nc-detail-value"><?php echo $val($RowNCS['Accion']); ?></span>
+                                    </div>
+                                    <div class="nc-detail-field nc-detail-field--full">
+                                        <span class="nc-detail-label">Resultado esperado</span>
+                                        <span class="nc-detail-value"><?php echo $val($RowNCS['Resultado']); ?></span>
+                                    </div>
+                                    <div class="nc-detail-field">
+                                        <span class="nc-detail-label">Fecha apertura</span>
+                                        <span class="nc-detail-value"><?php echo $val(self::darFechaHora($RowNCS['FHSeguimiento'], 3)); ?></span>
+                                    </div>
+                                    <div class="nc-detail-field">
+                                        <span class="nc-detail-label">Fecha seguimiento</span>
+                                        <span class="nc-detail-value"><?php echo $val(self::darFecha($RowNCS['Fecha'])); ?></span>
+                                    </div>
+                                    <div class="nc-detail-field">
+                                        <span class="nc-detail-label">Realizado por</span>
+                                        <span class="nc-detail-value"><?php echo $val($RowNCS['RealizadoPor']); ?></span>
+                                    </div>
+                                    <div class="nc-detail-field">
+                                        <span class="nc-detail-label">Alcanzado</span>
+                                        <span class="nc-detail-value"><?php echo $RowNCS['Alcanzado'] == 1 ? 'Sí' : ($RowNCS['Alcanzado'] == -1 ? 'No' : '—'); ?></span>
+                                    </div>
+                                </div>
+                            </article>
+                        <?php endforeach; ?>
+                    </div>
+                </section>
+            <?php endif; ?>
+
+            <?php if ($esCerrada): ?>
+                <section class="nc-detail-section">
+                    <h6 class="nc-detail-section-title">Datos del cierre</h6>
+                    <div class="nc-detail-meta">
+                        <div class="nc-detail-field nc-detail-field--full">
+                            <span class="nc-detail-label">Resultados de la revisión</span>
+                            <span class="nc-detail-value"><?php echo $val($Row['ResultadoRevision']); ?></span>
+                        </div>
+                        <div class="nc-detail-field nc-detail-field--full">
+                            <span class="nc-detail-label">Motivos del cierre</span>
+                            <span class="nc-detail-value"><?php echo $val($Row['MotivoCierre']); ?></span>
+                        </div>
+                        <div class="nc-detail-field">
+                            <span class="nc-detail-label">Nueva acción</span>
+                            <span class="nc-detail-value"><?php echo $val($Row['NuevaAccion']); ?></span>
+                        </div>
+                        <div class="nc-detail-field">
+                            <span class="nc-detail-label">Fecha del cierre</span>
+                            <span class="nc-detail-value"><?php echo $val(self::darFecha($Row['FCierre'])); ?></span>
+                        </div>
+                        <div class="nc-detail-field">
+                            <span class="nc-detail-label">Responsable del cierre</span>
+                            <span class="nc-detail-value"><?php echo $val($Row['RCierre']); ?></span>
+                        </div>
+                    </div>
+                </section>
+            <?php endif; ?>
+        </div>
+        <?php
         return response(ob_get_clean());
     }
 

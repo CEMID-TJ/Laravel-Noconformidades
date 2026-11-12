@@ -21,7 +21,7 @@
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/i18n/es.js"></script>
 
     <!-- 2. ESTILOS PERSONALIZADOS -->
-    <link rel="stylesheet" href="{{ asset('css/no-conformidad.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/no-conformidad.css') }}?v={{ filemtime(public_path('css/no-conformidad.css')) }}">
     
     <!-- 3. SCRIPTS GLOBALES -->
     <script src="{{ asset('js/global.js') }}"></script>
@@ -117,20 +117,20 @@
                 <table class="table table-striped table-bordered small">
                     <thead>
                         <tr>
-                            <th width="10%">Fecha / ID solicitud</th>
-                            <th width="17%">Responsable Apertura</th>
-                            <th width="12%">Proceso</th>
-                            <th width="41%">Descripción</th>
+                            <th width="11%">Fecha / ID solicitud</th>
+                            <th width="15%">Responsable Apertura</th>
+                            <th width="10%">Proceso</th>
+                            <th width="36%">Descripción</th>
                             <th width="10%">Detectada en</th>
-                            <th width="10%">Acciones</th>
+                            <th width="18%">Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="TBodyNoConformidad">
                         @forelse($noConformidades as $Row)
-                            <tr>
+                            <tr data-id="{{ $Row->NumeroNC }}">
                                 <td data-label="Fecha / ID SOLICITUD">
                                     {{ \App\Http\Controllers\NoConformidadController::darFechaHora($Row->FApertura, 1) }}
-                                    (<a class="link-modern" style="cursor:pointer" title="Consultar registro" onClick="MostrarDivConsultaNoConformidad({{ $Row->NumeroNC }});"><i class="bi bi-eye me-1"></i>{{ $Row->NumeroNC }}</a>)
+                                    (<a class="link-modern" style="cursor:pointer" title="Consultar registro" onClick="MostrarDivConsultaNoConformidad({{ $Row->NumeroNC }});">{{ $Row->NumeroNC }}</a>)
                                 </td>
                                 <td data-label="Responsable">{{ $Row->NomResponsable }}</td>
                                 <td data-label="Proceso">{{ $Row->Proceso . ' (' . $Row->CodGestion . ')' }}</td>
@@ -146,14 +146,17 @@
                                     <div class="acciones-cell">
                                         @if(!empty($Row->FCierre) && $Row->FCierre > '0000-00-00')
                                             <span class="fecha-cierre">{{ \App\Http\Controllers\NoConformidadController::darFecha($Row->FCierre) }}</span>
+                                        @endif
+                                        <a class="action-btn action-view" onClick="MostrarDivConsultaNoConformidad({{ $Row->NumeroNC }});" title="Consultar registro" aria-label="Consultar registro"><i class="bi bi-eye"></i></a>
+                                        @if(!empty($Row->FCierre) && $Row->FCierre > '0000-00-00')
                                             @if($PuedeReversar)
-                                                <a class="action-btn action-danger" onClick="ReversarNoConformidad({{ $Row->NumeroNC }})" title="Reversar"><i class="bi bi-arrow-counterclockwise"></i></a>
+                                                <a class="action-btn action-danger" onClick="ReversarNoConformidad({{ $Row->NumeroNC }})" title="Reversar" aria-label="Reversar"><i class="bi bi-arrow-counterclockwise"></i></a>
                                             @endif
                                         @else
-                                            <a class="action-btn action-edit" onClick="MostrarDivEditarNoConformidad({{ $Row->NumeroNC }});" title="Editar"><i class="bi bi-pencil-square"></i></a>
-                                            <a class="action-btn action-list" onClick="MostrarDivSeguimientos({{ $Row->NumeroNC }});" title="Seguimientos"><i class="bi bi-list-check"></i></a>
+                                            <a class="action-btn action-edit" onClick="MostrarDivEditarNoConformidad({{ $Row->NumeroNC }});" title="Editar" aria-label="Editar"><i class="bi bi-pencil-square"></i></a>
+                                            <a class="action-btn action-list" onClick="MostrarDivSeguimientos({{ $Row->NumeroNC }});" title="Seguimientos" aria-label="Seguimientos"><i class="bi bi-list-check"></i></a>
                                             @if($PuedeCerrar)
-                                                <a class="action-btn action-success" onClick="MostrarDivCerrarNoConformidad({{ $Row->NumeroNC }})" title="Cerrar"><i class="bi bi-check2-circle"></i></a>
+                                                <a class="action-btn action-success" onClick="MostrarDivCerrarNoConformidad({{ $Row->NumeroNC }})" title="Cerrar" aria-label="Cerrar"><i class="bi bi-check2-circle"></i></a>
                                             @endif
                                         @endif
                                     </div>
@@ -211,7 +214,7 @@
     <div class="modal-dialog modal-dialog-scrollable modal-xl" style="max-width:98%">
         <div class="modal-content">
             <div class="modal-header"><h5 class="modal-title"><i class="bi bi-eye"></i> Consulta Registro</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-            <div class="modal-body"><div class="row" id="ModalConsultaNoConformidadBody">...</div></div>
+            <div class="modal-body"><div id="ModalConsultaNoConformidadBody">...</div></div>
             <div class="modal-footer"><button type="button" class="btn btn-danger" data-bs-dismiss="modal"><i class="bi bi-x-lg"></i> Cerrar</button></div>
         </div>
     </div>
@@ -395,6 +398,16 @@
         $('#FiltroCodGestion, #FiltroProceso, #FiltroTipo, #FiltroTipoAcciones, #Ordencito').select2({ language: 'es', width: '100%' });
         $('#CodGestion, #Proceso, #Tipo, #DetectadaEn, #RequiereAC').select2({ language: 'es', dropdownParent: $('#ModalEditarNoConformidad'), width: '100%' });
         $('#TipoReporte, #ReportProceso').select2({ language: 'es', dropdownParent: $('#ModalReportes'), width: '100%' });
+
+        // En tablet y móvil, tocar la tarjeta abre el detalle completo (salvo en botones o enlaces)
+        $(document).on('click', '#TBodyNoConformidad tr[data-id]', function (e) {
+            if (!window.matchMedia('(max-width: 991px)').matches) { return; }
+            if ($(e.target).closest('a, button, input, select, textarea').length) { return; }
+            var sel = window.getSelection();
+            if (sel && !sel.isCollapsed && this.contains(sel.anchorNode)) { return; }
+            var id = $(this).data('id');
+            if (id) { MostrarDivConsultaNoConformidad(id); }
+        });
     });
 
     function ValidarFiltros() { document.FrmFiltrar.submit(); }
