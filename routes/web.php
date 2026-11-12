@@ -31,5 +31,8 @@ Route::prefix('noconformidades')->name('noconformidades.')->group(function () {
     Route::get('/procesos/{id}', [NoConformidadController::class, 'getProcesos'])->name('procesos');
     Route::get('/reportes', [NoConformidadController::class, 'generateReport'])->name('reportes');
     Route::post('/reversar', [NoConformidadController::class, 'revert'])->name('reversar');
+
+    // 6. Archivo adjunto
+    Route::post('/archivo/eliminar', [NoConformidadController::class, 'deleteArchivo'])->name('archivo.delete');
     
 });

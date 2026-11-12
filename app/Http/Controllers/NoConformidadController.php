@@ -508,4 +508,28 @@ class NoConformidadController extends Controller
             return response()->json(['status' => 'error', 'message' => $e->getMessage()]);
         }
     }
+
+    // 12. ELIMINAR ARCHIVO ADJUNTO
+    public function deleteArchivo(Request $request)
+    {
+        try {
+            $numNC = intval($request->input('NumeroNC'));
+            if ($numNC <= 0) {
+                return response()->json(['status' => 'error', 'message' => 'Registro inválido.']);
+            }
+
+            $pdfPath = public_path('Archivos/NoConformidades/' . $numNC . '.pdf');
+            if (!is_file($pdfPath)) {
+                return response()->json(['status' => 'error', 'message' => 'El archivo adjunto no existe.']);
+            }
+
+            if (!unlink($pdfPath)) {
+                return response()->json(['status' => 'error', 'message' => 'No se pudo eliminar el archivo adjunto.']);
+            }
+
+            return response()->json(['status' => 'success']);
+        } catch (\Exception $e) {
+            return response()->json(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
 }

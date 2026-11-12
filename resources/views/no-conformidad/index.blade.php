@@ -98,7 +98,7 @@
                 <div class="col-12 col-md-2 d-flex justify-content-md-end justify-content-center">
                     <div class="actions-box">
                         <button class="btn-nav" type="button" onClick="ValidarFiltros();" title="Filtrar"><i class="bi bi-search"></i></button>
-                        <a onClick="MostrarDivEditarNoConformidad('Nuevo');" class="btn-nav btn-nav-primary" title="Crear"><i class="bi bi-plus-lg"></i></a>
+                        <a onClick="MostrarDivEditarNoConformidad('Nuevo');" class="btn-nav btn-nav-primary" title="Crear"><i class="bi bi-plus-circle"></i></a>
                         <button class="btn-nav" type="button" onClick="MostrarDivReportes();" title="Reportes"><i class="bi bi-file-earmark-excel"></i></button>
                         <a href="{{ url('/noconformidades') }}" class="btn-nav" title="Regresar"><i class="bi bi-house"></i></a>
                     </div>
@@ -130,7 +130,7 @@
                             <tr>
                                 <td data-label="Fecha / ID SOLICITUD">
                                     {{ \App\Http\Controllers\NoConformidadController::darFechaHora($Row->FApertura, 1) }}
-                                    (<a class="link-modern" style="cursor:pointer" onClick="MostrarDivConsultaNoConformidad({{ $Row->NumeroNC }});">{{ $Row->NumeroNC }}</a>)
+                                    (<a class="link-modern" style="cursor:pointer" title="Consultar registro" onClick="MostrarDivConsultaNoConformidad({{ $Row->NumeroNC }});"><i class="bi bi-eye me-1"></i>{{ $Row->NumeroNC }}</a>)
                                 </td>
                                 <td data-label="Responsable">{{ $Row->NomResponsable }}</td>
                                 <td data-label="Proceso">{{ $Row->Proceso . ' (' . $Row->CodGestion . ')' }}</td>
@@ -265,11 +265,18 @@
                                 <!-- INPUT DE ARCHIVO NATIVO DE BOOTSTRAP -->
                                 <div class="form-group">
                                 <label>Documento Adjunto</label>
-                                    <!-- Botón de Bootstrap nativo -->
-                                    <label for="FileNoConformidad" class="btn btn-upload-file w-100 d-flex align-items-center justify-content-center gap-2 py-2" id="LabelFileNoConformidad">
-                                        <i class="bi bi-file-earmark-pdf-fill fs-5"></i>
-                                        <span id="SpanFileNoConformidad">Seleccionar archivo PDF</span>
-                                    </label>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <!-- Botón de Bootstrap nativo -->
+                                        <label for="FileNoConformidad" class="btn btn-upload-file flex-grow-1 d-flex align-items-center justify-content-center gap-2 py-2 mb-0" id="LabelFileNoConformidad">
+                                            <i class="bi bi-file-earmark-pdf-fill fs-5"></i>
+                                            <span id="SpanFileNoConformidad">Seleccionar archivo PDF</span>
+                                        </label>
+
+                                        <!-- Basurita para descartar la selección o eliminar el PDF guardado -->
+                                        <button type="button" class="action-btn action-danger flex-shrink-0 d-none" id="BtnEliminarArchivo" data-existente="0" onClick="EliminarArchivoNoConformidad();" title="Eliminar PDF adjunto">
+                                            <i class="bi bi-trash3"></i>
+                                        </button>
+                                    </div>
                                     
                                     <!-- Input real (oculto con la clase d-none) -->
                                     <input type="file" id="FileNoConformidad" name="FileNoConformidad" class="d-none" accept="application/pdf" onChange="ValidarArchivo(this)">
@@ -392,36 +399,87 @@
 
     function ValidarFiltros() { document.FrmFiltrar.submit(); }
 
+    // Devuelve el botón de archivo a su estado inicial (o al PDF ya guardado)
+    function restaurarBotonArchivo() {
+        var label = document.getElementById('LabelFileNoConformidad');
+        var span = document.getElementById('SpanFileNoConformidad');
+        var btn = document.getElementById('BtnEliminarArchivo');
+
+        if (btn.dataset.existente === '1') {
+            span.innerHTML = 'Reemplazar PDF existente';
+            label.classList.add('archivo-cargado');
+            btn.classList.remove('d-none');
+        } else {
+            span.innerHTML = 'Seleccionar archivo PDF';
+            label.classList.remove('archivo-cargado');
+            btn.classList.add('d-none');
+        }
+    }
+
     // Valida el archivo nativo de Bootstrap al seleccionarlo
     function ValidarArchivo(input) {
         var file = input.files[0];
-        var span = document.getElementById('SpanFileNoConformidad');
-        var label = document.getElementById('LabelFileNoConformidad');
 
         if (!file) {
-            span.innerHTML = 'Seleccionar archivo PDF';
-            label.classList.remove('archivo-cargado'); // Quitar verde
+            restaurarBotonArchivo();
             return;
         }
 
         if (file.type !== "application/pdf") {
             MostrarDatoObser("¡Error! Solo se admiten archivos en formato PDF");
-            input.value = ''; 
-            span.innerHTML = 'Seleccionar archivo PDF';
+            input.value = '';
+            restaurarBotonArchivo();
             return;
         }
         if (file.size > 4 * 1024 * 1024) {
             MostrarDatoObser("¡Error! El archivo supera el tamaño máximo permitido (4MB)");
-            input.value = ''; 
-            span.innerHTML = 'Seleccionar archivo PDF';
+            input.value = '';
+            restaurarBotonArchivo();
             return;
         }
 
         var nombre = file.name;
         if (nombre.length > 35) nombre = nombre.substring(0, 32) + '...';
-        span.innerHTML = nombre;
-        
-        label.classList.add('archivo-cargado'); // Poner verde
+        document.getElementById('SpanFileNoConformidad').innerHTML = nombre;
+        document.getElementById('LabelFileNoConformidad').classList.add('archivo-cargado');
+        document.getElementById('BtnEliminarArchivo').classList.remove('d-none');
+    }
+
+    // Descarta la selección local o elimina el PDF ya guardado en el servidor
+    function EliminarArchivoNoConformidad() {
+        var input = document.getElementById('FileNoConformidad');
+        var btn = document.getElementById('BtnEliminarArchivo');
+
+        // Si hay un archivo recién seleccionado, solo se descarta la selección
+        if (input.files && input.files.length > 0) {
+            input.value = '';
+            restaurarBotonArchivo();
+            return;
+        }
+
+        // Si no hay selección nueva, se elimina el PDF guardado
+        if (btn.dataset.existente !== '1') { return; }
+
+        var numeroNC = document.getElementById('NumeroNC').value;
+        if (!numeroNC || numeroNC === 'Nuevo') { return; }
+        if (!confirm('¿Eliminar el PDF adjunto? Esta acción no se puede deshacer.')) { return; }
+
+        btn.disabled = true;
+        $.ajax({
+            type: 'POST', url: "{{ route('noconformidades.archivo.delete') }}", data: { NumeroNC: numeroNC }, dataType: 'json', cache: false
+        }).done(function (response) {
+            if (response.status === 'success') {
+                btn.dataset.existente = '0';
+                restaurarBotonArchivo();
+                MostrarDatoObser('PDF eliminado correctamente.', true);
+            } else {
+                MostrarDatoObser(response.message || 'No se pudo eliminar el PDF.');
+            }
+        }).fail(function () {
+            MostrarDatoObser('Error de conexión al eliminar el PDF.');
+        }).always(function () {
+            btn.disabled = false;
+        });
     }
 
     function ScrollAlPrimerError(contenedor) {
@@ -451,12 +509,10 @@
         $("#FrmNoConformidad").find("input:text,select,textarea").removeClass("alert-danger");
         $("#BotsNoConformidad").show();
         
-        // Reseteamos el botón del archivo al estado inicial
+        // Reseteamos el estado del archivo (selección local y PDF existente)
         document.getElementById('FileNoConformidad').value = '';
-        var labelFile = document.getElementById('LabelFileNoConformidad');
-        var spanFile = document.getElementById('SpanFileNoConformidad');
-        labelFile.classList.remove('archivo-cargado');
-        spanFile.innerHTML = 'Seleccionar archivo PDF';
+        document.getElementById('BtnEliminarArchivo').dataset.existente = '0';
+        restaurarBotonArchivo();
 
         if (mNumeroNC == 'Nuevo') {
             $("#TituloModalNoConformidad").html('<i class="bi bi-plus-circle"></i> Crear Nueva No Conformidad');
@@ -492,11 +548,9 @@
                 document.getElementById('Accion').value = data.Accion || '';
                 document.getElementById('FRevision').value = data.FRevision || '';
                 
-                // Si ya hay PDF, ponerlo verde con nuestra nueva clase
-                if (data.YaCargado === 1) { 
-                    spanFile.innerHTML = 'Reemplazar PDF existente';
-                    labelFile.classList.add('archivo-cargado'); 
-                }
+                // Si ya hay PDF, habilitar reemplazo y eliminación
+                document.getElementById('BtnEliminarArchivo').dataset.existente = (data.YaCargado === 1) ? '1' : '0';
+                restaurarBotonArchivo();
                 
                 $("#ModalEditarNoConformidad").modal('show');
             });
